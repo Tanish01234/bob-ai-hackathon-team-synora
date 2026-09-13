@@ -1,0 +1,22 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Node / Next
+node_modules/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Supabase local files
+supabase/.temp/
+
+# OS
+.DS_Store

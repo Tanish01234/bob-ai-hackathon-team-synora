@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-panel: #0F1729;
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #0A0F1E;
+  --color-secondary: #162038;
+  --color-secondary-foreground: #E2E8F0;
+  --color-muted: #162038;
+  --color-muted-foreground: #7A8FAD;
+  --color-subtle: #4A5D78;
+  --color-accent: #1E2D4A;
+  --color-accent-foreground: #E2E8F0;
+  --color-destructive: #EF4444;
+  --color-warning: #F59E0B;
+  --color-success: #10B981;
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --color-chart-1: #00D4FF;
+  --color-chart-2: #10B981;
+  --color-chart-3: #EF4444;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --animate-shimmer: shimmer 1.5s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  --animate-radar-sweep: radar-sweep 4s linear infinite;
+  --animate-ship-bobbing: ship-bobbing 3.8s ease-in-out infinite;
+  --animate-water-swell: water-swell 4.2s ease-in-out infinite;
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.6); opacity: 0; }
+    100% { transform: scale(0.95); opacity: 0; }
+  }
+  @keyframes radar-sweep {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes ship-bobbing {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    30% { transform: translateY(-3px) rotate(0.5deg); }
+    70% { transform: translateY(2px) rotate(-0.4deg); }
+  }
+  @keyframes water-swell {
+    0%, 100% { transform: scaleX(1) translateY(0); opacity: 0.75; }
+    50% { transform: scaleX(1.06) translateY(-1.5px); opacity: 0.95; }
+  }
+}
+
+:root {
+  color-scheme: dark;
+  --background: #0A0F1E;
+  --foreground: #E2E8F0;
+  --card: #162038;
+  --primary: #00D4FF;
+  --border: #1E2D4A;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body { @apply h-full overflow-hidden; }
+  body { @apply bg-background font-sans text-sm text-foreground antialiased; }
+  button { @apply cursor-pointer; }
+  button:disabled { @apply cursor-not-allowed; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-primary; }
+  ::selection { @apply bg-primary/25 text-foreground; }
+  * { scrollbar-width: thin; scrollbar-color: #1E2D4A transparent; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1E2D4A; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2A4070; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
