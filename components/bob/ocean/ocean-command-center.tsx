@@ -33,6 +33,7 @@ import { OceanCanvas } from "./ocean-canvas";
 import { OceanControls } from "./ocean-controls";
 import { VesselIntelligencePanel } from "./vessel-intelligence-panel";
 import { FleetOverviewPanel } from "./fleet-overview-panel";
+import { DEFAULT_FLEET_VESSELS } from "./constants";
 
 import { getFleetTracking, getShipmentTracking, getSimulationState } from "@/lib/api/tracking";
 import { getShipmentAIAnalysis } from "@/lib/api/ai";
@@ -48,7 +49,7 @@ export function OceanCommandCenter({ initialShipmentId }: OceanCommandCenterProp
 
   // Selected Vessel & Telemetry
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(initialShipmentId || null);
-  const [vessels, setVessels] = useState<VesselState[]>([]);
+  const [vessels, setVessels] = useState<VesselState[]>(DEFAULT_FLEET_VESSELS);
   const [activeRouteSegments, setActiveRouteSegments] = useState<RouteSegment[]>([]);
   const [alternativeRoutes, setAlternativeRoutes] = useState<AlternativeRoute[]>([]);
 
@@ -91,7 +92,7 @@ export function OceanCommandCenter({ initialShipmentId }: OceanCommandCenterProp
         getSimulationState().catch(() => null),
       ]);
 
-      if (fleetData && Array.isArray(fleetData)) {
+      if (fleetData && Array.isArray(fleetData) && fleetData.length > 0) {
         setVessels(fleetData);
       }
       if (simulationData) {

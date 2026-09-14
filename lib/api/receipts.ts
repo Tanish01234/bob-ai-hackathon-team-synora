@@ -2,6 +2,7 @@ import { API_BASE_URL } from './client';
 import { createClient } from '@/lib/supabase/client';
 
 export async function downloadTransitReceipt(shipmentId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
   let token: string | null = null;
   try {
     const supabase = createClient();

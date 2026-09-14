@@ -7,9 +7,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains' })
 
 export const metadata: Metadata = {
-  title: 'Bob — Supply Chain Intelligence',
-  description: 'Your supply chain, in focus. Explore global disruptions, shipment risks, and cold-chain temperature insights in the Bob operations dashboard demo.',
-  applicationName: 'Bob',
+  title: 'BOB — Supply Chain Intelligence | by Team Synora',
+  description: 'Enterprise Maritime Supply Chain Intelligence Platform. Real-time fleet tracking, disruption mitigation, and cold-chain integrity monitoring by Team Synora.',
+  applicationName: 'BOB Supply Chain Intelligence',
   icons: { icon: '/bob-icon.svg' },
 }
 

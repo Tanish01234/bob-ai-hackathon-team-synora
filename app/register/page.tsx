@@ -58,10 +58,11 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#070B14] text-[#E2E8F0] flex flex-col justify-center items-center px-4">
       <div className="w-full max-w-md bg-[#0D1527] border border-[#1E293B] rounded-xl p-8 shadow-2xl">
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-8 text-center">
           <BobMark className="text-[#00D4FF] mb-3" />
-          <h1 className="text-xl font-bold tracking-wider uppercase text-white">Create Account</h1>
-          <p className="text-xs text-[#7A8FAD] mt-1">Autonomous Supply Chain Risk Intelligence</p>
+          <h1 className="text-xl font-bold tracking-wide text-white uppercase">BOB Supply Chain Intelligence</h1>
+          <span className="text-[10px] font-mono tracking-widest text-[#00D4FF]/90 uppercase mt-1">by Team Synora</span>
+          <p className="text-xs text-[#7A8FAD] mt-1.5">Create your enterprise operator account</p>
         </div>
 
         {error && (
@@ -140,6 +141,12 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
+      </div>
+
+      <div className="mt-5 text-center">
+        <p className="text-[11px] font-mono text-slate-500 tracking-wider">
+          BOB Supply Chain Intelligence · <span className="text-slate-400">by Team Synora</span>
+        </p>
       </div>
     </div>
   );
