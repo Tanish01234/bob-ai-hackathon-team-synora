@@ -6,8 +6,13 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  // Do not redirect backend service / API proxy routes to login
+  if (request.nextUrl.pathname.startsWith('/svc/')) {
+    return supabaseResponse;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || '';
 
   // If Supabase is not configured, don't crash the middleware
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -34,11 +39,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // Do not redirect backend service / API proxy routes to login
-  if (request.nextUrl.pathname.startsWith('/svc/')) {
-    return supabaseResponse;
-  }
 
   // Redirect unauthenticated users away from dashboard to /login
   const isAuthRoute =
