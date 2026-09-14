@@ -1,0 +1,70 @@
+team:
+  name: "Team Synora"
+  track: "AI"
+  lead:
+    name: "Tanish Bedia"
+    github: "https://github.com/Tanish01234"
+    email: "tanishbedia@example.com" # NOTE: Update with official hackathon registration email
+  members:
+    - name: "Tanish Bedia"
+      role: "Lead Architect & Full Stack Engineer"
+      github: "https://github.com/Tanish01234"
+
+submission:
+  title: "BOB Supply Chain Intelligence"
+  tagline: "Autonomous Supply Chain Risk Intelligence with Grounded AI Reasoning & Cold-Chain Integrity Monitoring"
+  track: "AI"
+  repository_url: "https://github.com/Tanish01234/bob-ai-hackathon-team-synora"
+  live_demo_url: "https://bob-ai-hackathon-team-synora.vercel.app"
+  demo_video_url: "NOT PROVIDED" # NOTE: Replace with 3-5 minute demo video URL
+
+  problem_statement: >
+    Modern global logistics operations face a pervasive "fog of war." When maritime
+    bottlenecks, typhoons, or port strikes occur, operations teams are overwhelmed by
+    hundreds of active in-transit shipments across disconnected spreadsheets and carrier
+    tracking portals. Identifying which shipments are genuinely at risk takes hours.
+    For temperature-sensitive cargo (pharmaceuticals, vaccines, perishables), cold-chain
+    excursions frequently go unnoticed until delivery, causing catastrophic spoilage and
+    hundreds of thousands of dollars in lost cargo. Disconnected operational signals lead
+    to slow, reactive decision-making.
+
+  solution_summary: >
+    BOB is an autonomous supply chain risk intelligence platform that unites real-time
+    vessel simulation, live OpenWeatherMap marine meteorology, deterministic disruption
+    matching, strict regulatory cold-chain excursion detection, and grounded AI reasoning.
+    BOB continuously tracks 250 active shipments across global maritime routes, evaluates
+    composite risk scores across delay, weather, disruption, and temperature dimensions,
+    and enables operators to interact directly with an operational AI copilot backed by
+    primary Google Gemini and fallback Groq (Llama 3.1) intelligence to evaluate verified
+    alternative routes and mitigation actions.
+
+  key_features:
+    - "Deterministic Disruption Matching: Algorithmic waypoint, current-leg, and destination intersection matching across 250 active shipments without hallucination."
+    - "Cold Chain Integrity Engine: Strict duration-temperature excursion detection (excursions >2h flagged critical) with sensor log timelines and regulatory compliance states."
+    - "Live Simulation & Telemetry Clock: High-speed deterministic coordinate simulation with configurable multiplier (1x-100x) and waypoint progress calculation."
+    - "Real Weather Integration: Live marine meteorology via OpenWeatherMap API with automatic vessel cruising speed modifiers and ETA delay propagation."
+    - "Unified Composite Risk Engine: Multi-factor scoring engine evaluating weather severity, disruption severity, cold-chain status, and delay impact."
+    - "Grounded BOB AI Copilot: Load-bearing operational assistant with primary Google Gemini and fallback Groq (Llama 3.1) providing verified routing recommendations."
+    - "Automated Transit Receipts: Server-side cryptographic transit documentation and PDF receipt generation for audit and compliance."
+    - "Judge Demo Mode: Instant, frictionless guest authentication via Supabase Auth enabling evaluators to inspect live operational data with zero setup."
+
+  tech_stack:
+    frontend:
+      framework: "Next.js 16.3.3 (Turbopack, App Router)"
+      ui: "React 19, Tailwind CSS 4, Lucide Icons, Recharts"
+      maps: "Leaflet & OpenStreetMap interactive route mapping"
+      state: "Client-side in-memory cache & Promise deduplication"
+    backend:
+      framework: "FastAPI (Python 3.13)"
+      validation: "Pydantic v2 schemas & domain models"
+      http_client: "HTTPX with connection pooling"
+      pdf_generation: "ReportLab"
+    database_and_auth:
+      provider: "Supabase (PostgreSQL with Row-Level Security)"
+      auth: "Supabase JWT Auth with Judge Demo automated bootstrap"
+    ai_and_external_apis:
+      primary_ai: "Google Gemini 1.5 Flash (via Gemini API)"
+      fallback_ai: "Groq (Llama 3.1 8B via Groq API)"
+      weather_api: "OpenWeatherMap REST API"
+    deployment:
+      platform: "Vercel Services (Next.js frontend + FastAPI backend on same-origin /svc/api routing)"

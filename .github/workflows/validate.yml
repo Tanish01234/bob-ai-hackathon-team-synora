@@ -1,0 +1,171 @@
+name: Validate Submission & Repository
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  submission-compliance:
+    name: Submission Compliance & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate submission.yaml Structure
+        run: |
+          python3 -c "
+          import yaml, sys
+          with open('submission.yaml', 'r') as f:
+              data = yaml.safe_load(f)
+          
+          if 'team' not in data or 'submission' not in data:
+              print('Missing team or submission top-level keys', file=sys.stderr)
+              sys.exit(1)
+
+          team = data['team']
+          if team.get('name') != 'Team Synora':
+              print(f'Invalid team name: {team.get(\"name\")}', file=sys.stderr)
+              sys.exit(1)
+
+          if team.get('track') != 'AI':
+              print(f'Invalid track: {team.get(\"track\")}', file=sys.stderr)
+              sys.exit(1)
+
+          sub = data['submission']
+          required_sub = ['title', 'repository_url', 'live_demo_url', 'problem_statement', 'solution_summary', 'key_features']
+          for field in required_sub:
+              if not sub.get(field):
+                  print(f'Missing required submission field: {field}', file=sys.stderr)
+                  sys.exit(1)
+
+          if not isinstance(sub['key_features'], list) or len(sub['key_features']) < 4:
+              print('key_features must be a list of at least 4 items', file=sys.stderr)
+              sys.exit(1)
+
+          print('submission.yaml is valid and contains all required hackathon fields.')
+          "
+
+      - name: Verify Required Documentation & Artifacts
+        run: |
+          REQUIRED_FILES=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "submission.yaml"
+            "docs/problem-statement.md"
+            "docs/solution-overview.md"
+            "docs/architecture.md"
+            "docs/setup-guide.md"
+            "demo/live-demo-url.txt"
+            "demo/demo-video-link.txt"
+            "demo/README.md"
+            "presentation/slides.pdf"
+            "demo/screenshots/01-home-dashboard.png"
+            "demo/screenshots/02-bob-ai.png"
+            "demo/screenshots/03-shipment-intelligence.png"
+          )
+
+          MISSING=0
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Missing required file: $file"
+              MISSING=$((MISSING + 1))
+            else
+              echo "Found: $file"
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "Failed: $MISSING required files are missing."
+            exit 1
+          fi
+
+      - name: Verify No Generic src/ Directory Exists
+        run: |
+          if [ -d "src" ]; then
+            echo "::error::CRITICAL VIOLATION: A generic src/ directory exists. BOB must maintain root domain directories (app/, backend/, components/, lib/, etc.)."
+            exit 1
+          fi
+          echo "Architectural compliance verified: No src/ directory present."
+
+      - name: Secret Leak Scan
+        run: |
+          echo "Checking git index for accidental secret files..."
+          if git ls-files | grep -E "^\.env(\.local|\.production|\.development)?$"; then
+            echo "::error::Secret file committed into repository!"
+            exit 1
+          fi
+
+          echo "Scanning for exposed private/service keys in tracked code..."
+          SUSPICIOUS=$(git grep -EI "SUPABASE_SERVICE_ROLE_KEY=[^xX<\"][A-Za-z0-9_\.\-]{20,}" -- ':!.env.example' ':!docs/*' ':!scratch/*' || true)
+          if [ -n "$SUSPICIOUS" ]; then
+            echo "::error::Potential live Supabase service key detected in tracked files:"
+            echo "$SUSPICIOUS"
+            exit 1
+          fi
+          echo "Secret scan passed successfully."
+
+  backend-tests:
+    name: Backend Test Suite (Pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest httpx
+
+      - name: Run Pytest
+        env:
+          SUPABASE_URL: "https://mock.supabase.co"
+          SUPABASE_ANON_KEY: "mock-anon-key"
+          SUPABASE_SERVICE_ROLE_KEY: "mock-service-key"
+        run: |
+          PYTHONPATH=backend pytest backend/tests/ -v
+
+  frontend-check:
+    name: Frontend Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Validate Next.js Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock-anon-key"
+        run: pnpm run build
