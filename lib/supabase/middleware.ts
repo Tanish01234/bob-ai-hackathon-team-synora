@@ -55,5 +55,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Redirect unauthenticated visitors from protected routes to /login
+  if (!user && !isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }

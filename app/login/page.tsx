@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { clearExplicitLogout } from '@/lib/auth-bootstrap';
+import { clearExplicitLogout, loginJudgeDemo } from '@/lib/auth-bootstrap';
 import { BobMark } from '@/components/bob/primitives';
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL || 'judge@bob.ai';
@@ -18,6 +18,16 @@ export default function LoginPage() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
   const router = useRouter();
+
+  // If a genuine session is already active, direct user to dashboard
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then((res: any) => {
+      if (res?.data?.session?.access_token) {
+        router.replace('/');
+      }
+    });
+  }, [router]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -39,8 +49,18 @@ export default function LoginPage() {
         return;
       }
 
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setError('Authentication session was not established. Please try again.');
+        setLoading(false);
+        return;
+      }
+
       clearExplicitLogout();
-      router.push('/');
+      router.replace('/');
       router.refresh();
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -55,20 +75,14 @@ export default function LoginPage() {
     setDemoLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: DEMO_EMAIL,
-        password: DEMO_PASSWORD,
-      });
-
-      if (signInError) {
-        setDemoError(`Demo access failed: ${signInError.message}`);
+      const authState = await loginJudgeDemo();
+      if (!authState.token) {
+        setDemoError('Failed to establish secure demo session. Please try again.');
         setDemoLoading(false);
         return;
       }
 
-      clearExplicitLogout();
-      router.push('/');
+      router.replace('/');
       router.refresh();
     } catch (err: any) {
       setDemoError(err?.message || 'Demo access is temporarily unavailable. Please try again or use a normal account.');

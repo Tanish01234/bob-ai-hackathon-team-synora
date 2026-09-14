@@ -8,7 +8,7 @@ import { STATS, DISRUPTIONS, AFFECTED_SHIPMENTS, SENSOR_DATA, COLD_CHAIN_CARGO, 
 import { BobMark, Globe, Icon } from './primitives';
 import { DisruptionFeed } from './disruption-feed';
 import { ShipmentDetail } from './shipment-detail';
-import { ensureAuthSession, logoutUser, subscribeAuth } from '@/lib/auth-bootstrap';
+import { ensureAuthSession, logoutUser, subscribeAuth, type AuthStatus } from '@/lib/auth-bootstrap';
 import { getStats } from '@/lib/api/stats';
 import { getDisruptions, matchDisruption } from '@/lib/api/disruptions';
 import { getShipmentSensorCheck } from '@/lib/api/shipments';
@@ -327,6 +327,7 @@ export function BobDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(STATS);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('AUTH_INITIALIZING');
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [affectedShipmentsMap, setAffectedShipmentsMap] = useState<Record<string, Shipment[]>>({});
   const [sensorDataMap, setSensorDataMap] = useState<Record<string, SensorData>>({});
@@ -342,6 +343,7 @@ export function BobDashboard() {
 
   useEffect(() => {
     const unsubscribe = subscribeAuth((state) => {
+      setAuthStatus(state.status);
       if (state.user?.email) {
         setUserEmail(state.user.email);
       } else {
@@ -350,40 +352,20 @@ export function BobDashboard() {
     });
 
     ensureAuthSession().then((authState) => {
-      if (authState.user?.email) {
-        setUserEmail(authState.user.email);
+      setAuthStatus(authState.status);
+      if (authState.status !== 'AUTHENTICATED') {
+        router.replace('/login');
+        return;
       }
-      // Re-fetch backend data once authenticated
+      setUserEmail(authState.user?.email || null);
+      // Fetch authenticated backend data
       getStats().then((data) => setStats(mapStats(data))).catch(() => {});
       getDisruptions().then((data) => {
         if (data && data.length > 0) setDisruptions(data.map((d) => mapDisruption(d)));
-      }).catch(() => {});
+        else setDisruptions(DISRUPTIONS);
+      }).catch(() => setDisruptions(DISRUPTIONS));
       getSimulationState().then((data) => setSimulationState(data)).catch(() => {});
     });
-
-    getStats()
-      .then((data) => setStats(mapStats(data)))
-      .catch((err) => {
-        console.warn('Backend stats not available, using demo fallback:', err?.message || err);
-      });
-
-    getDisruptions()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setDisruptions(data.map((d) => mapDisruption(d)));
-        } else {
-          setDisruptions(DISRUPTIONS);
-        }
-      })
-      .catch((err) => {
-        console.warn('Backend disruptions not available, using demo fallback:', err?.message || err);
-        setDisruptions(DISRUPTIONS);
-      });
-
-    // Fetch simulation state
-    getSimulationState()
-      .then((data) => setSimulationState(data))
-      .catch(() => { });
 
     const simInterval = setInterval(() => {
       getSimulationState()
@@ -396,13 +378,13 @@ export function BobDashboard() {
       clearInterval(simInterval);
       unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   async function handleLogout() {
     try {
       await logoutUser();
     } finally {
-      router.push('/login');
+      router.replace('/login');
       router.refresh();
     }
   }
@@ -501,6 +483,30 @@ export function BobDashboard() {
       }
     }
   }, [disruptions]);
+
+  if (authStatus === 'AUTH_INITIALIZING') {
+    return (
+      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-slate-400 font-mono text-xs gap-3">
+        <BobMark className="text-[#00D4FF] mb-2 animate-pulse" />
+        <div className="size-6 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+        <span className="tracking-widest uppercase text-[11px] text-cyan-400/90 font-semibold">
+          Connecting to BOB Intelligence...
+        </span>
+        <span className="text-[9px] text-slate-500">Autonomous Supply Chain Risk Intelligence</span>
+      </div>
+    );
+  }
+
+  if (authStatus === 'AUTH_UNAUTHENTICATED' || authStatus === 'AUTH_ERROR') {
+    return (
+      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-slate-400 font-mono text-xs gap-2">
+        <BobMark className="text-[#00D4FF] mb-2" />
+        <span className="tracking-widest uppercase text-[11px] text-slate-400">
+          Redirecting to Login...
+        </span>
+      </div>
+    );
+  }
 
   const tourStats = {
     total: stats.total,

@@ -119,55 +119,7 @@ export async function ensureAuthSession(options?: {
         return state;
       }
 
-      // 2. Check if user explicitly logged out in this browser session
-      const isExplicitLogout =
-        sessionStorage.getItem('bob_explicit_logout') === 'true';
-
-      if (isExplicitLogout) {
-        const state: AuthState = {
-          status: 'AUTH_UNAUTHENTICATED',
-          user: null,
-          session: null,
-          token: null,
-        };
-        setAuthState(state);
-        return state;
-      }
-
-      // 3. Frictionless Judge Demo Auto-Bootstrap (Direct root load)
-      const allowAutoDemo = options?.autoLoginDemo !== false;
-      if (allowAutoDemo) {
-        const { data, error: signInError } =
-          await supabase.auth.signInWithPassword({
-            email: DEMO_EMAIL,
-            password: DEMO_PASSWORD,
-          });
-
-        if (signInError) {
-          console.warn('[auth-bootstrap] Auto demo sign-in failed:', signInError.message);
-          const state: AuthState = {
-            status: 'AUTH_UNAUTHENTICATED',
-            user: null,
-            session: null,
-            token: null,
-            error: signInError.message,
-          };
-          setAuthState(state);
-          return state;
-        }
-
-        if (data?.session?.access_token) {
-          const state: AuthState = {
-            status: 'AUTHENTICATED',
-            user: data.user,
-            session: data.session,
-            token: data.session.access_token,
-          };
-          setAuthState(state);
-          return state;
-        }
-      }
-
+      // 2. If no active session, user is unauthenticated
       const state: AuthState = {
         status: 'AUTH_UNAUTHENTICATED',
         user: null,
@@ -223,3 +175,37 @@ export function clearExplicitLogout(): void {
     sessionStorage.removeItem('bob_explicit_logout');
   }
 }
+
+/**
+ * Explicit Judge Demo Login:
+ * Signs in using configured demo credentials, verifies session, and returns AuthState.
+ */
+export async function loginJudgeDemo(): Promise<AuthState> {
+  clearExplicitLogout();
+  const supabase = createClient();
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
+  });
+
+  if (signInError) {
+    throw new Error(signInError.message);
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const activeSession = sessionData?.session || signInData?.session;
+
+  if (!activeSession?.access_token) {
+    throw new Error('Failed to establish secure demo session token.');
+  }
+
+  const state: AuthState = {
+    status: 'AUTHENTICATED',
+    user: activeSession.user,
+    session: activeSession,
+    token: activeSession.access_token,
+  };
+  setAuthState(state);
+  return state;
+}
+
