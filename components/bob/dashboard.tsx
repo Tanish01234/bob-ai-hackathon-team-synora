@@ -8,7 +8,7 @@ import { STATS, DISRUPTIONS, AFFECTED_SHIPMENTS, SENSOR_DATA, COLD_CHAIN_CARGO, 
 import { BobMark, Globe, Icon } from './primitives';
 import { DisruptionFeed } from './disruption-feed';
 import { ShipmentDetail } from './shipment-detail';
-import { createClient } from '@/lib/supabase/client';
+import { ensureAuthSession, logoutUser, subscribeAuth } from '@/lib/auth-bootstrap';
 import { getStats } from '@/lib/api/stats';
 import { getDisruptions, matchDisruption } from '@/lib/api/disruptions';
 import { getShipmentSensorCheck } from '@/lib/api/shipments';
@@ -341,24 +341,24 @@ export function BobDashboard() {
   const detailRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then((res: any) => {
-      if (res?.data?.user?.email) {
-        setUserEmail(res.data.user.email);
-      }
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      if (session?.user?.email) {
-        setUserEmail(session.user.email);
-        getStats().then((data) => setStats(mapStats(data))).catch(() => {});
-        getDisruptions().then((data) => {
-          if (data && data.length > 0) setDisruptions(data.map((d) => mapDisruption(d)));
-        }).catch(() => {});
-        getSimulationState().then((data) => setSimulationState(data)).catch(() => {});
+    const unsubscribe = subscribeAuth((state) => {
+      if (state.user?.email) {
+        setUserEmail(state.user.email);
       } else {
         setUserEmail(null);
       }
+    });
+
+    ensureAuthSession().then((authState) => {
+      if (authState.user?.email) {
+        setUserEmail(authState.user.email);
+      }
+      // Re-fetch backend data once authenticated
+      getStats().then((data) => setStats(mapStats(data))).catch(() => {});
+      getDisruptions().then((data) => {
+        if (data && data.length > 0) setDisruptions(data.map((d) => mapDisruption(d)));
+      }).catch(() => {});
+      getSimulationState().then((data) => setSimulationState(data)).catch(() => {});
     });
 
     getStats()
@@ -394,14 +394,13 @@ export function BobDashboard() {
     return () => {
       if (timer.current) clearTimeout(timer.current);
       clearInterval(simInterval);
-      authListener?.subscription?.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
   async function handleLogout() {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await logoutUser();
     } finally {
       router.push('/login');
       router.refresh();

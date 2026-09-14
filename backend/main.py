@@ -57,8 +57,9 @@ api_router.include_router(ai_router)
 api_router.include_router(admin_router)
 api_router.include_router(receipts_router)
 
-# Mount routes at root and under /svc/api for Vercel Services & reverse-proxy compatibility
+# Mount routes at root, /api, and /svc/api for reverse-proxy & Vercel Services compatibility
 app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
 app.include_router(api_router, prefix="/svc/api")
 
 

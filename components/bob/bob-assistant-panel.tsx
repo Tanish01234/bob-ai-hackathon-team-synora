@@ -21,6 +21,7 @@ import {
 import Image from 'next/image';
 import { OceanShipLauncher } from './ocean-ai/ocean-ship-launcher';
 import { chatWithBob, type AIChatResponse } from '@/lib/api/ai';
+import { ensureAuthSession, subscribeAuth, type AuthStatus } from '@/lib/auth-bootstrap';
 
 export interface ChatMessage {
   id: string;
@@ -47,7 +48,15 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('AUTH_INITIALIZING');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to auth bootstrap status
+  useEffect(() => {
+    return subscribeAuth((state) => {
+      setAuthStatus(state.status);
+    });
+  }, []);
 
   // Sync propIsOpen
   useEffect(() => {
@@ -110,6 +119,15 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
     const query = (textToSend || inputMessage).trim();
     if (!query || isLoading) return;
 
+    // Await auth bootstrap readiness if still initializing
+    if (authStatus === 'AUTH_INITIALIZING') {
+      try {
+        await ensureAuthSession();
+      } catch {
+        // let request proceed and apiClient handle errors
+      }
+    }
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -144,10 +162,16 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {
+      let friendlyError = err?.message || 'Network error';
+      if (err?.status === 401) {
+        friendlyError = 'Authentication session required or expired. Please sign in or use Judge Demo mode.';
+      } else if (err?.status === 503) {
+        friendlyError = 'Bob AI reasoning engine is momentarily unavailable. Please retry.';
+      }
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: `Error retrieving response from Bob AI engine: ${err?.message || 'Network error'}. Please retry.`,
+        content: `Error from Bob AI engine: ${friendlyError}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -231,6 +255,17 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
                   <span className="text-[9px] font-mono text-cyan-400 font-semibold px-1.5 py-0.2 rounded bg-cyan-500/10 border border-cyan-500/30">
                     OCEAN INTELLIGENCE
                   </span>
+                  {authStatus === 'AUTH_INITIALIZING' ? (
+                    <span className="text-[9px] font-mono text-amber-400 font-medium px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 animate-pulse flex items-center gap-1">
+                      <span className="size-1 rounded-full bg-amber-400 animate-ping" />
+                      CONNECTING...
+                    </span>
+                  ) : authStatus === 'AUTHENTICATED' ? (
+                    <span className="text-[9px] font-mono text-emerald-400 font-medium px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
+                      <span className="size-1 rounded-full bg-emerald-400" />
+                      ONLINE
+                    </span>
+                  ) : null}
                 </div>
                 {activeShipmentId ? (
                   <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
@@ -376,8 +411,8 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
                     <button
                       key={i}
                       onClick={() => sendMessage(item)}
-                      disabled={isLoading}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600 transition-colors truncate max-w-[190px]"
+                      disabled={isLoading || authStatus === 'AUTH_INITIALIZING'}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600 transition-colors truncate max-w-[190px] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {item}
                     </button>
@@ -394,18 +429,20 @@ export function BobAssistantPanel({ initialShipmentId, isOpen: propIsOpen, onClo
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={
-                      activeShipmentId
+                      authStatus === 'AUTH_INITIALIZING'
+                        ? 'Connecting to BOB intelligence...'
+                        : activeShipmentId
                         ? `Ask Bob about ${activeShipmentId}...`
                         : 'Ask Bob about shipments, weather, disruptions...'
                     }
-                    disabled={isLoading}
-                    className="flex-1 px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={isLoading || authStatus === 'AUTH_INITIALIZING'}
+                    className="flex-1 px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <button
                     onClick={() => sendMessage()}
-                    disabled={!inputMessage.trim() || isLoading}
+                    disabled={!inputMessage.trim() || isLoading || authStatus === 'AUTH_INITIALIZING'}
                     className="p-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    title="Send"
+                    title={authStatus === 'AUTH_INITIALIZING' ? 'Connecting to BOB intelligence...' : 'Send'}
                   >
                     <Send className="w-3.5 h-3.5" />
                   </button>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { clearExplicitLogout } from '@/lib/auth-bootstrap';
 import { BobMark } from '@/components/bob/primitives';
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL || 'judge@bob.ai';
@@ -38,6 +39,7 @@ export default function LoginPage() {
         return;
       }
 
+      clearExplicitLogout();
       router.push('/');
       router.refresh();
     } catch (err) {
@@ -65,6 +67,7 @@ export default function LoginPage() {
         return;
       }
 
+      clearExplicitLogout();
       router.push('/');
       router.refresh();
     } catch (err: any) {
