@@ -24,6 +24,12 @@
         "service": "backend",
         "path": "/$1"
       }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
     }
   ]
 }
