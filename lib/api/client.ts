@@ -1,16 +1,25 @@
 import { createClient } from '@/lib/supabase/client';
 
 export function getApiBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (envUrl) {
-    return envUrl.replace(/\/+$/, '');
-  }
-  // In the browser, use same-origin /svc/api routing (no localhost dependency in production)
+  // In the browser, always use same-origin /svc/api routing in production on Vercel
   if (typeof window !== 'undefined') {
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (isLocalhost && envUrl && !envUrl.includes('/svc/api')) {
+      return envUrl.replace(/\/+$/, '');
+    }
     return '/svc/api';
   }
-  // Server-side (SSR / Node): use internal service URL or dev localhost
-  return (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000').replace(/\/+$/, '');
+
+  // Server-side (SSR / Node): use internal service binding URL or dev localhost
+  return (
+    process.env.BACKEND_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:8000'
+  ).replace(/\/+$/, '');
 }
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -32,17 +41,40 @@ export async function apiClient<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let token: string | null = null;
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+      token = session.access_token;
+      // Proactively refresh if expiring within 60 seconds
+      if (session.expires_at && session.expires_at * 1000 < Date.now() + 60000) {
+        try {
+          const { data: refreshData } = await supabase.auth.refreshSession();
+          if (refreshData?.session?.access_token) {
+            token = refreshData.session.access_token;
+          }
+        } catch {
+          // retain existing token if refresh attempt fails
+        }
+      }
+    }
+  } catch (authErr) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[apiClient] Unable to retrieve Supabase session:', authErr);
+    }
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
-  if (session?.access_token) {
-    headers['Authorization'] = `Bearer ${session.access_token}`;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const baseUrl = getApiBaseUrl();
@@ -67,12 +99,11 @@ export async function apiClient<T>(
     try {
       errorData = await response.json();
     } catch {
-      // not JSON
+      // response is not json
     }
 
-    if (response.status === 401 && typeof window !== 'undefined') {
-      // Token expired or invalid
-      window.location.href = '/login';
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[apiClient] ${response.status} from ${endpoint}:`, errorData?.detail || response.statusText);
     }
 
     throw new ApiError(

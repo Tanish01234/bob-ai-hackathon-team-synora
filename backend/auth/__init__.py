@@ -33,25 +33,20 @@ async def get_current_user(
     token = credentials.credentials
     settings = get_settings()
 
-    if not settings.supabase_jwt_secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server misconfigured: JWT secret not set",
-        )
-
     user_id = None
 
     # 1. Verify directly via Supabase Auth (supports ES256, RS256, HS256)
     try:
         from db import get_supabase
         sb = get_supabase()
-        user_res = sb.auth.get_user(token)
-        if user_res and user_res.user:
-            user_id = user_res.user.id
+        if sb:
+            user_res = sb.auth.get_user(token)
+            if user_res and user_res.user:
+                user_id = user_res.user.id
     except Exception:
         pass
 
-    # 2. Fallback to local JWT decode
+    # 2. Fallback to local JWT decode if secret is configured
     if not user_id and settings.supabase_jwt_secret:
         try:
             payload = jwt.decode(

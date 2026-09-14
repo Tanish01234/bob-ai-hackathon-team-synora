@@ -60,15 +60,15 @@ export default function LoginPage() {
       });
 
       if (signInError) {
-        setDemoError('Demo access is temporarily unavailable. Please try again or use a normal account.');
+        setDemoError(`Demo access failed: ${signInError.message}`);
         setDemoLoading(false);
         return;
       }
 
       router.push('/');
       router.refresh();
-    } catch {
-      setDemoError('Demo access is temporarily unavailable. Please try again or use a normal account.');
+    } catch (err: any) {
+      setDemoError(err?.message || 'Demo access is temporarily unavailable. Please try again or use a normal account.');
       setDemoLoading(false);
     }
   }

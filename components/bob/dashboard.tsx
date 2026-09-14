@@ -342,9 +342,22 @@ export function BobDashboard() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.email) {
-        setUserEmail(data.user.email);
+    supabase.auth.getUser().then((res: any) => {
+      if (res?.data?.user?.email) {
+        setUserEmail(res.data.user.email);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      if (session?.user?.email) {
+        setUserEmail(session.user.email);
+        getStats().then((data) => setStats(mapStats(data))).catch(() => {});
+        getDisruptions().then((data) => {
+          if (data && data.length > 0) setDisruptions(data.map((d) => mapDisruption(d)));
+        }).catch(() => {});
+        getSimulationState().then((data) => setSimulationState(data)).catch(() => {});
+      } else {
+        setUserEmail(null);
       }
     });
 
@@ -381,6 +394,7 @@ export function BobDashboard() {
     return () => {
       if (timer.current) clearTimeout(timer.current);
       clearInterval(simInterval);
+      authListener?.subscription?.unsubscribe();
     };
   }, []);
 

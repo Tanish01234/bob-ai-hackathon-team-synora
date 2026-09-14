@@ -20,3 +20,7 @@ supabase/.temp/
 
 # OS
 .DS_Store
+
+# Temporary scratch scripts
+scratch/
+
