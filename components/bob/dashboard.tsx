@@ -8,7 +8,7 @@ import { STATS, DISRUPTIONS, AFFECTED_SHIPMENTS, SENSOR_DATA, COLD_CHAIN_CARGO, 
 import { BobMark, Globe, Icon } from './primitives';
 import { DisruptionFeed } from './disruption-feed';
 import { ShipmentDetail } from './shipment-detail';
-import { ensureAuthSession, logoutUser, subscribeAuth, type AuthStatus } from '@/lib/auth-bootstrap';
+import { ensureAuthSession, getAuthState, logoutUser, subscribeAuth, type AuthStatus } from '@/lib/auth-bootstrap';
 import { getStats } from '@/lib/api/stats';
 import { getDisruptions, matchDisruption } from '@/lib/api/disruptions';
 import { getShipmentSensorCheck } from '@/lib/api/shipments';
@@ -327,7 +327,9 @@ export function BobDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(STATS);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('AUTH_INITIALIZING');
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() => getAuthState().status);
+  const hasAuthenticatedRef = useRef(getAuthState().status === 'AUTHENTICATED');
+  const isLoggingOutRef = useRef(false);
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [affectedShipmentsMap, setAffectedShipmentsMap] = useState<Record<string, Shipment[]>>({});
   const [sensorDataMap, setSensorDataMap] = useState<Record<string, SensorData>>({});
@@ -344,10 +346,16 @@ export function BobDashboard() {
   useEffect(() => {
     const unsubscribe = subscribeAuth((state) => {
       setAuthStatus(state.status);
+      if (state.status === 'AUTHENTICATED') {
+        hasAuthenticatedRef.current = true;
+      }
       if (state.user?.email) {
         setUserEmail(state.user.email);
       } else {
         setUserEmail(null);
+      }
+      if (state.status === 'AUTH_UNAUTHENTICATED' && !isLoggingOutRef.current) {
+        router.replace('/login');
       }
     });
 
@@ -357,6 +365,7 @@ export function BobDashboard() {
         router.replace('/login');
         return;
       }
+      hasAuthenticatedRef.current = true;
       setUserEmail(authState.user?.email || null);
       // Fetch authenticated backend data
       getStats().then((data) => setStats(mapStats(data))).catch(() => {});
@@ -381,11 +390,12 @@ export function BobDashboard() {
   }, [router]);
 
   async function handleLogout() {
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
     try {
       await logoutUser();
     } finally {
       router.replace('/login');
-      router.refresh();
     }
   }
 
@@ -484,7 +494,8 @@ export function BobDashboard() {
     }
   }, [disruptions]);
 
-  if (authStatus === 'AUTH_INITIALIZING') {
+  // Only display full-screen connecting state during initial cold boot before first authentication
+  if (!hasAuthenticatedRef.current && authStatus === 'AUTH_INITIALIZING') {
     return (
       <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-slate-400 font-mono text-xs gap-3">
         <BobMark className="text-[#00D4FF] mb-2 animate-pulse" />

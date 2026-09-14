@@ -41,8 +41,7 @@ export default function RegisterPage() {
 
       // If user session exists immediately (e.g. email confirmation disabled), go to dashboard
       if (data.session) {
-        router.push('/');
-        router.refresh();
+        router.replace('/');
       } else {
         setSuccessMsg(
           'Registration successful! If email confirmation is enabled on your Supabase instance, please check your inbox.'

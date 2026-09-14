@@ -61,7 +61,6 @@ export default function LoginPage() {
 
       clearExplicitLogout();
       router.replace('/');
-      router.refresh();
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
       setLoading(false);
@@ -83,7 +82,6 @@ export default function LoginPage() {
       }
 
       router.replace('/');
-      router.refresh();
     } catch (err: any) {
       setDemoError(err?.message || 'Demo access is temporarily unavailable. Please try again or use a normal account.');
       setDemoLoading(false);

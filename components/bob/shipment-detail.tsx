@@ -203,7 +203,12 @@ function AIReasoningSection({
 
     {/* AI Reasoning trigger */}
     {!expanded ? (
-      <button data-tour="ai-analysis-btn" onClick={triggerAnalysis} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/10 cursor-pointer">
+      <button
+        type="button"
+        data-tour="ai-analysis-btn"
+        onClick={triggerAnalysis}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/10 cursor-pointer"
+      >
         <Icon name="sparkle" className="size-4" />✦ Analyze with AI
       </button>
     ) : aiLoading ? (
@@ -224,7 +229,11 @@ function AIReasoningSection({
       <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
         <p className="text-[12px] text-destructive mb-1 font-medium">Bob couldn&apos;t complete the analysis right now.</p>
         {risk && <p className="text-[11px] text-muted-foreground mb-3">Current rule-based risk: <span className="font-semibold uppercase text-foreground">{risk.overall_risk}</span></p>}
-        <button onClick={triggerAnalysis} className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary hover:bg-primary/20 cursor-pointer">
+        <button
+          type="button"
+          onClick={triggerAnalysis}
+          className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary hover:bg-primary/20 cursor-pointer"
+        >
           Retry Analysis
         </button>
       </div>

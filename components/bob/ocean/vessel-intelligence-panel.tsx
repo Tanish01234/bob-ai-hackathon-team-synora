@@ -196,12 +196,18 @@ export function VesselIntelligencePanel({
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
+      let friendlyError = "Bob AI reasoning engine is temporarily unavailable. Live shipment telemetry is still operating normally.";
+      if (e?.status === 401) {
+        friendlyError = "Authentication session required or expired. Please sign in again.";
+      } else if (e?.status === 400) {
+        friendlyError = e?.data?.detail || "Invalid question parameters.";
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "assistant",
-          content: "Bob AI is temporarily unavailable. Live shipment telemetry is still operating normally.",
+          content: friendlyError,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
@@ -590,24 +596,36 @@ export function VesselIntelligencePanel({
           </div>
 
           {/* Chat Input */}
-          <div className="flex items-center gap-1.5 pt-1">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            className="flex items-center gap-1.5 pt-1"
+          >
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
               placeholder={`Ask Bob about ${shipmentId}...`}
               className="flex-1 bg-[#162038]/80 border border-[#1E2D4A] rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
             />
             <button
-              onClick={() => handleSendMessage()}
+              type="submit"
               disabled={isChatLoading || !chatInput.trim()}
-              className="p-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 disabled:opacity-40 disabled:hover:bg-cyan-500 transition-colors shadow-md"
+              className="p-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 disabled:opacity-40 disabled:hover:bg-cyan-500 transition-colors shadow-md cursor-pointer disabled:cursor-not-allowed"
               title="Send question"
+              aria-label="Send question"
             >
               <Send className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

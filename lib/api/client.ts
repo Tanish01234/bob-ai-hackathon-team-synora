@@ -1,4 +1,5 @@
 import { ensureAuthSession } from '@/lib/auth-bootstrap';
+import { createClient } from '@/lib/supabase/client';
 
 export function getApiBaseUrl(): string {
   // In the browser, always use same-origin /svc/api routing in production on Vercel
@@ -43,9 +44,21 @@ export async function apiClient<T>(
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  // 1. Wait for auth readiness and obtain the current valid session token
-  const auth = await ensureAuthSession();
-  let token = auth.token;
+  // 1. Obtain current valid session token directly at request time
+  let token: string | null = null;
+  if (typeof window !== 'undefined') {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    token = session?.access_token || null;
+
+    // If no token from session, ensure auth bootstrap has evaluated
+    if (!token) {
+      const auth = await ensureAuthSession();
+      token = auth.token;
+    }
+  }
 
   const buildHeaders = (bearerToken?: string | null): Record<string, string> => {
     const h: Record<string, string> = {
@@ -76,16 +89,18 @@ export async function apiClient<T>(
     );
   }
 
-  // 2. One 401 refresh/retry attempt if token was expired or invalid
+  // 2. Safe 401 flow: retry ONCE if session can be refreshed
   if (response.status === 401 && typeof window !== 'undefined') {
     try {
-      const refreshedAuth = await ensureAuthSession({ forceRefresh: true });
-      if (refreshedAuth.token && refreshedAuth.token !== token) {
-        token = refreshedAuth.token;
+      const supabase = createClient();
+      const { data: refreshData } = await supabase.auth.refreshSession();
+      const refreshedToken = refreshData?.session?.access_token;
+      if (refreshedToken && refreshedToken !== token) {
+        token = refreshedToken;
         response = await makeRequest(token);
       }
     } catch {
-      // retain original response if refresh attempt fails
+      // Retain original 401 response if refresh fails
     }
   }
 
@@ -101,10 +116,14 @@ export async function apiClient<T>(
       errorData?.detail || `API request failed with status ${response.status}`;
 
     if (response.status === 401) {
-      friendlyMessage = errorData?.detail || 'Authentication token required or expired';
+      friendlyMessage =
+        errorData?.detail || 'Authentication session required or expired. Please sign in again.';
     } else if (response.status === 503) {
       friendlyMessage =
-        errorData?.detail || 'Bob AI intelligence provider is currently unavailable';
+        errorData?.detail ||
+        'Bob AI intelligence provider is currently unavailable. Live telemetry remains active.';
+    } else if (response.status === 400) {
+      friendlyMessage = errorData?.detail || 'Invalid request parameters.';
     }
 
     if (process.env.NODE_ENV === 'development') {
