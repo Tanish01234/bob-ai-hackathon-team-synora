@@ -114,6 +114,7 @@ def test_calculate_eta():
 
 
 def test_fleet_tracking_batch():
+    from unittest.mock import patch
     from main import app
     from auth import get_current_user
     from fastapi.testclient import TestClient
@@ -121,16 +122,52 @@ def test_fleet_tracking_batch():
     app.dependency_overrides[get_current_user] = lambda: "fe19ebd4-24f2-40f8-9250-9c49cc3331c2"
     client = TestClient(app)
 
-    resp = client.get("/fleet/tracking")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    first = data[0]
-    assert "shipment_id" in first
-    assert "latitude" in first
-    assert "longitude" in first
-    assert "current_speed_knots" in first
-    assert "progress_percent" in first
-    assert "risk" in first
+    mock_shipment = {
+        "shipment_id": "SHP-1001",
+        "origin": "Singapore (SGSIN)",
+        "destination": "Rotterdam (NLRTM)",
+        "carrier": "Maersk",
+        "cargo_type": "standard",
+        "value_usd": 125000,
+        "total_distance_km": 15000,
+        "cruising_speed_knots": 18.0,
+        "departure_time": "2026-03-01T00:00:00Z",
+        "eta": "2026-03-25T12:00:00Z",
+        "status": "in_transit",
+        "current_leg": "Malacca Strait",
+        "route_waypoints": ["Singapore", "Malacca Strait", "Rotterdam"],
+        "route_segments": [
+            {
+                "from_waypoint": "Singapore",
+                "to_waypoint": "Malacca Strait",
+                "end_coordinate": {"lat": 4.21, "lng": 100.55},
+                "distance_km": 500,
+            },
+            {
+                "from_waypoint": "Malacca Strait",
+                "to_waypoint": "Rotterdam",
+                "end_coordinate": {"lat": 51.95, "lng": 4.14},
+                "distance_km": 14500,
+            },
+        ],
+    }
+
+    try:
+        with patch("db.queries.get_all_shipments_raw", return_value=[mock_shipment]), \
+             patch("db.queries.get_all_disruptions", return_value=[]):
+            resp = client.get("/fleet/tracking")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert isinstance(data, list)
+            assert len(data) > 0
+            first = data[0]
+            assert "shipment_id" in first
+            assert "latitude" in first
+            assert "longitude" in first
+            assert "current_speed_knots" in first
+            assert "progress_percent" in first
+            assert "risk" in first
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
 

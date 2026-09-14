@@ -106,14 +106,59 @@ jobs:
             exit 1
           fi
 
-          echo "Scanning for exposed private/service keys in tracked code..."
-          SUSPICIOUS=$(git grep -EI "SUPABASE_SERVICE_ROLE_KEY=[^xX<\"][A-Za-z0-9_\.\-]{20,}" -- ':!.env.example' ':!docs/*' ':!scratch/*' || true)
-          if [ -n "$SUSPICIOUS" ]; then
-            echo "::error::Potential live Supabase service key detected in tracked files:"
-            echo "$SUSPICIOUS"
-            exit 1
-          fi
-          echo "Secret scan passed successfully."
+          echo "Scanning tracked code for exposed live credentials (ignoring documented placeholders)..."
+          python3 -c "
+          import subprocess, re, os, sys
+
+          PLACEHOLDER_SUBSTRINGS = [
+              'your_', 'your-', 'your', 'replace', 'placeholder', 'dummy', 'mock',
+              'example', 'changeme', 'sample', 'fake', 'todo', 'xxx', 'test'
+          ]
+
+          SECRET_PATTERNS = [
+              (r'(?i)(SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ANON_KEY)\s*[:=]\s*[\"\'<]?([A-Za-z0-9_\.\-]+)[\"\'>]?', 'Supabase Key'),
+              (r'(?i)(GEMINI_API_KEY)\s*[:=]\s*[\"\'<]?([A-Za-z0-9_\.\-]+)[\"\'>]?', 'Gemini API Key'),
+              (r'(?i)(GROQ_API_KEY)\s*[:=]\s*[\"\'<]?([A-Za-z0-9_\.\-]+)[\"\'>]?', 'Groq API Key'),
+              (r'(?i)(OPENWEATHER_API_KEY)\s*[:=]\s*[\"\'<]?([A-Za-z0-9_\.\-]+)[\"\'>]?', 'OpenWeather API Key'),
+          ]
+
+          def is_placeholder(val: str) -> bool:
+              v = val.strip('\"\'<> ').lower()
+              if not v or len(v) < 10:
+                  return True
+              for sub in PLACEHOLDER_SUBSTRINGS:
+                  if sub in v:
+                      return True
+              return False
+
+          files = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          violations = []
+
+          for fpath in files:
+              if not os.path.isfile(fpath):
+                  continue
+              if fpath.endswith(('.png', '.jpg', '.jpeg', '.pdf', '.ico', '.woff', '.woff2')):
+                  continue
+              try:
+                  with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                      for line_no, line in enumerate(f, 1):
+                          for pattern, label in SECRET_PATTERNS:
+                              m = re.search(pattern, line)
+                              if m:
+                                  val = m.group(2).strip('\"\'<> ')
+                                  if not is_placeholder(val):
+                                      if len(val) >= 20 or val.startswith(('gsk_', 'AIzaSy', 'eyJ')):
+                                          violations.append((fpath, line_no, label))
+              except Exception:
+                  pass
+
+          if violations:
+              for fpath, line_no, label in violations:
+                  print(f'::error file={fpath},line={line_no}::Potential live {label} detected in {fpath}:{line_no} (value hidden for security)')
+              sys.exit(1)
+          else:
+              print('Secret scan passed: No live credentials detected. Placeholders validated as safe.')
+          "
 
   backend-tests:
     name: Backend Test Suite (Pytest)
@@ -156,7 +201,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile

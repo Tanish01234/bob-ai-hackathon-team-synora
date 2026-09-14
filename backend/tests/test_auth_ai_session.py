@@ -56,18 +56,44 @@ def test_all_protected_endpoints_reject_unauthenticated():
 
 def test_ai_chat_authenticated_session_succeeds():
     """When a valid authenticated session is established, AI chat processes successfully."""
+    from unittest.mock import patch, AsyncMock
+
     # Override auth dependency with authenticated user (valid UUID format)
     app.dependency_overrides[get_current_user] = lambda: "00000000-0000-0000-0000-000000000001"
 
+    mock_fleet = {
+        "total_shipments": 250,
+        "in_transit": 200,
+        "delayed": 36,
+        "delivered": 14,
+        "active_disruptions": 12,
+        "affected_shipments": 40,
+        "critical_alerts": 8,
+        "cold_chain_critical": 8,
+    }
+
+    ai_mock_response = (
+        {
+            "answer": "The fleet has 250 active shipments with 12 active disruptions.",
+            "risk_level": "medium",
+            "recommended_action": "monitor",
+        },
+        "gemini",
+    )
+
     try:
-        response = client.post(
-            "/api/ai/chat",
-            json={"message": "What is the fleet status and active disruptions?"},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert "sources" in data
-        assert isinstance(data["sources"], list)
+        with patch("api.ai.get_fleet_summary", return_value=mock_fleet), \
+             patch("api.ai.get_high_risk_shipments", return_value=[]), \
+             patch("api.ai.ai_service.call_ai", new_callable=AsyncMock, return_value=ai_mock_response):
+            response = client.post(
+                "/api/ai/chat",
+                json={"message": "What is the fleet status and active disruptions?"},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "answer" in data
+            assert "sources" in data
+            assert isinstance(data["sources"], list)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
