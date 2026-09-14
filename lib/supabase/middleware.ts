@@ -35,6 +35,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Do not redirect backend service / API proxy routes to login
+  if (request.nextUrl.pathname.startsWith('/svc/')) {
+    return supabaseResponse;
+  }
+
   // Redirect unauthenticated users away from dashboard to /login
   const isAuthRoute =
     request.nextUrl.pathname.startsWith('/login') ||

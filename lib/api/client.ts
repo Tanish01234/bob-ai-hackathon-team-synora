@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/client';
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+export function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  // In the browser, use same-origin /svc/api routing (no localhost dependency in production)
+  if (typeof window !== 'undefined') {
+    return '/svc/api';
+  }
+  // Server-side (SSR / Node): use internal service URL or dev localhost
+  return (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000').replace(/\/+$/, '');
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;
@@ -32,7 +45,8 @@ export async function apiClient<T>(
     headers['Authorization'] = `Bearer ${session.access_token}`;
   }
 
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   let response: Response;
   try {

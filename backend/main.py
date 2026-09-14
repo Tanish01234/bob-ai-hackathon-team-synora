@@ -1,9 +1,12 @@
-"""
-Bob — Supply Chain Intelligence API
-FastAPI application entry point.
-"""
+import sys
+from pathlib import Path
 
-from fastapi import FastAPI
+# Ensure backend directory is in sys.path for reliable module resolution in all deployment contexts
+_backend_dir = str(Path(__file__).resolve().parent)
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
@@ -43,24 +46,32 @@ app.add_middleware(
 )
 
 # ── Routes ────────────────────────────────────────────────────
-app.include_router(tracking_router)
-app.include_router(shipments_router)
-app.include_router(disruptions_router)
-app.include_router(stats_router)
-app.include_router(weather_router)
-app.include_router(alerts_router)
-app.include_router(ai_router)
-app.include_router(admin_router)
-app.include_router(receipts_router)
+api_router = APIRouter()
+api_router.include_router(tracking_router)
+api_router.include_router(shipments_router)
+api_router.include_router(disruptions_router)
+api_router.include_router(stats_router)
+api_router.include_router(weather_router)
+api_router.include_router(alerts_router)
+api_router.include_router(ai_router)
+api_router.include_router(admin_router)
+api_router.include_router(receipts_router)
+
+# Mount routes at root and under /svc/api for Vercel Services & reverse-proxy compatibility
+app.include_router(api_router)
+app.include_router(api_router, prefix="/svc/api")
 
 
 @app.get("/", tags=["Health"])
+@app.get("/svc/api", tags=["Health"])
 async def root():
     """API root — health check."""
     return {"status": "ok", "service": "Bob Supply Chain Intelligence API", "version": "2.0.0"}
 
 
 @app.get("/health", tags=["Health"])
+@app.get("/svc/api/health", tags=["Health"])
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+

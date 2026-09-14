@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './client';
+import { getApiBaseUrl, API_BASE_URL } from './client';
 import { createClient } from '@/lib/supabase/client';
 
 export async function downloadTransitReceipt(shipmentId: string): Promise<void> {
@@ -12,7 +12,8 @@ export async function downloadTransitReceipt(shipmentId: string): Promise<void> 
     // ignore
   }
 
-  const url = `${API_BASE_URL}/shipments/${shipmentId}/transit-receipt`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/shipments/${shipmentId}/transit-receipt`;
   const headers: Record<string, string> = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
