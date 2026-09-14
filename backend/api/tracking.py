@@ -9,7 +9,7 @@ from auth import get_current_user
 from db.queries import get_shipment_raw, get_all_shipments, get_all_disruptions, count_shipments_by_status, get_cold_chain_stats, get_alert_counts
 from models import TrackingResponse, DashboardSummary
 from services.tracking_service import get_shipment_tracking
-from services.weather_service import get_weather_at_position, get_speed_modifier
+from services.weather_service import get_cached_weather, get_speed_modifier
 from services.simulation_service import get_simulation_state
 from services.disruption_service import match_shipments
 
@@ -113,7 +113,8 @@ async def get_tracking(shipment_id: str, user_id: str = Depends(get_current_user
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
 
-    # Get weather at current position to determine speed modifier
+    # Check if weather at current position is cached (<0.01ms) to determine speed modifier.
+    # Non-blocking: live tracking coordinates return immediately in <2ms without waiting for external API.
     weather_modifier = 1.0
     try:
         # First get basic position to know coordinates
@@ -122,10 +123,11 @@ async def get_tracking(shipment_id: str, user_id: str = Depends(get_current_user
         lng = basic_tracking.current_position.lng
 
         if lat != 0 and lng != 0:
-            weather = await get_weather_at_position(lat, lng)
-            weather_modifier = get_speed_modifier(weather.severity)
+            cached_weather = get_cached_weather(lat, lng)
+            if cached_weather:
+                weather_modifier = get_speed_modifier(cached_weather.severity)
     except Exception as e:
-        print(f"⚠️  Weather lookup failed for tracking {shipment_id}: {e}")
+        print(f"⚠️  Weather cache check failed for tracking {shipment_id}: {e}")
 
     # Calculate full tracking with weather modifier
     tracking = get_shipment_tracking(shipment, weather_modifier=weather_modifier)

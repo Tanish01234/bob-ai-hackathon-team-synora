@@ -4,6 +4,7 @@ All Supabase queries parameterized by user_id for RLS compliance.
 """
 
 import json
+import time
 from db import get_supabase
 from models import Shipment, Disruption, SensorLog, SensorReading, Coordinate, RouteSegment
 
@@ -24,57 +25,93 @@ def get_all_shipments_raw(user_id: str) -> list[dict]:
     return result.data or []
 
 
-def get_shipment_by_id(user_id: str, shipment_id: str) -> Shipment | None:
-    """Get a single shipment by its display ID."""
-    sb = get_supabase()
-    result = (
-        sb.table("shipments")
-        .select("*")
-        .eq("user_id", user_id)
-        .eq("shipment_id", shipment_id)
-        .limit(1)
-        .execute()
-    )
-    if not result.data:
-        return None
-    return _row_to_shipment(result.data[0])
+def _exec_with_retry(query, retries: int = 2):
+    """Execute a Supabase query builder with quick retry on transient connection resets."""
+    for attempt in range(retries):
+        try:
+            return query.execute()
+        except Exception:
+            if attempt == retries - 1:
+                raise
+            time.sleep(0.08)
+
+
+_shipment_raw_cache: dict[str, tuple[float, dict]] = {}
+SHIPMENT_CACHE_TTL = 30.0  # seconds
+
+
+def invalidate_shipment_cache(user_id: str, shipment_id: str | None = None) -> None:
+    """Invalidate shipment cache for a user or specific shipment."""
+    if shipment_id:
+        _shipment_raw_cache.pop(f"{user_id}:{shipment_id}", None)
+    else:
+        keys_to_del = [k for k in _shipment_raw_cache if k.startswith(f"{user_id}:")]
+        for k in keys_to_del:
+            _shipment_raw_cache.pop(k, None)
 
 
 def get_shipment_raw(user_id: str, shipment_id: str) -> dict | None:
-    """Get a single shipment as raw dict (for tracking calculations)."""
+    """Get a single shipment as raw dict (for tracking calculations) with 30s cache."""
+    cache_key = f"{user_id}:{shipment_id}"
+    now = time.time()
+    if cache_key in _shipment_raw_cache:
+        cached_time, cached_row = _shipment_raw_cache[cache_key]
+        if now - cached_time < SHIPMENT_CACHE_TTL:
+            return dict(cached_row)
+
     sb = get_supabase()
-    result = (
+    result = _exec_with_retry(
         sb.table("shipments")
         .select("*")
         .eq("user_id", user_id)
         .eq("shipment_id", shipment_id)
         .limit(1)
-        .execute()
     )
     if not result.data:
         return None
-    return result.data[0]
+    row = result.data[0]
+    _shipment_raw_cache[cache_key] = (now, row)
+    return dict(row)
+
+
+def get_shipment_by_id(user_id: str, shipment_id: str) -> Shipment | None:
+    """Get a single shipment by its display ID."""
+    row = get_shipment_raw(user_id, shipment_id)
+    if not row:
+        return None
+    return _row_to_shipment(row)
 
 
 # ── Disruptions ───────────────────────────────────────────────
 
+_disruptions_cache: dict[str, tuple[float, list[Disruption]]] = {}
+DISRUPTIONS_CACHE_TTL = 30.0  # seconds
+
+
 def get_all_disruptions(user_id: str) -> list[Disruption]:
-    """Get all disruptions for a user."""
+    """Get all disruptions for a user (cached for 30s)."""
+    now = time.time()
+    if user_id in _disruptions_cache:
+        cached_time, cached_data = _disruptions_cache[user_id]
+        if now - cached_time < DISRUPTIONS_CACHE_TTL:
+            return list(cached_data)
+
     sb = get_supabase()
-    result = sb.table("disruptions").select("*").eq("user_id", user_id).execute()
-    return [_row_to_disruption(row) for row in result.data]
+    result = _exec_with_retry(sb.table("disruptions").select("*").eq("user_id", user_id))
+    data = [_row_to_disruption(row) for row in result.data]
+    _disruptions_cache[user_id] = (now, data)
+    return list(data)
 
 
 def get_disruption_by_id(user_id: str, disruption_id: str) -> Disruption | None:
     """Get a single disruption by its display ID."""
     sb = get_supabase()
-    result = (
+    result = _exec_with_retry(
         sb.table("disruptions")
         .select("*")
         .eq("user_id", user_id)
         .eq("disruption_id", disruption_id)
         .limit(1)
-        .execute()
     )
     if not result.data:
         return None
@@ -83,45 +120,61 @@ def get_disruption_by_id(user_id: str, disruption_id: str) -> Disruption | None:
 
 # ── Sensor Logs & Readings ───────────────────────────────────
 
-def get_sensor_log_for_shipment(user_id: str, shipment_id: str) -> SensorLog | None:
-    """Get sensor log + readings for a shipment (by display shipment_id)."""
-    sb = get_supabase()
+_sensor_log_cache: dict[str, tuple[float, SensorLog | None]] = {}
+SENSOR_LOG_CACHE_TTL = 30.0  # seconds
 
-    # First get the shipment's internal UUID
-    ship_result = (
-        sb.table("shipments")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("shipment_id", shipment_id)
-        .limit(1)
-        .execute()
-    )
-    if not ship_result.data:
+
+def get_sensor_log_for_shipment(user_id: str, shipment_id: str) -> SensorLog | None:
+    """Get sensor log + readings for a shipment (cached for 30s)."""
+    cache_key = f"{user_id}:{shipment_id}"
+    now = time.time()
+    if cache_key in _sensor_log_cache:
+        cached_time, cached_log = _sensor_log_cache[cache_key]
+        if now - cached_time < SENSOR_LOG_CACHE_TTL:
+            return cached_log
+
+    # Leverage cached raw shipment row if available to get internal id
+    ship_uuid = None
+    raw_ship = get_shipment_raw(user_id, shipment_id)
+    if raw_ship and "id" in raw_ship:
+        ship_uuid = raw_ship["id"]
+    else:
+        sb = get_supabase()
+        ship_result = _exec_with_retry(
+            sb.table("shipments")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("shipment_id", shipment_id)
+            .limit(1)
+        )
+        if ship_result.data:
+            ship_uuid = ship_result.data[0]["id"]
+
+    if not ship_uuid:
+        _sensor_log_cache[cache_key] = (now, None)
         return None
 
-    ship_uuid = ship_result.data[0]["id"]
-
+    sb = get_supabase()
     # Get the sensor log
-    log_result = (
+    log_result = _exec_with_retry(
         sb.table("sensor_logs")
         .select("*")
         .eq("user_id", user_id)
         .eq("shipment_id", ship_uuid)
         .limit(1)
-        .execute()
     )
     if not log_result.data:
+        _sensor_log_cache[cache_key] = (now, None)
         return None
 
     log_row = log_result.data[0]
 
     # Get readings ordered by timestamp
-    readings_result = (
+    readings_result = _exec_with_retry(
         sb.table("sensor_readings")
         .select("*")
         .eq("sensor_log_id", log_row["id"])
         .order("timestamp")
-        .execute()
     )
 
     readings = [
@@ -134,11 +187,13 @@ def get_sensor_log_for_shipment(user_id: str, shipment_id: str) -> SensorLog | N
         for r in readings_result.data
     ]
 
-    return SensorLog(
+    sensor_log = SensorLog(
         shipment_id=shipment_id,
         cargo_type=log_row["cargo_type"],
         readings=readings,
     )
+    _sensor_log_cache[cache_key] = (now, sensor_log)
+    return sensor_log
 
 
 # ── Stats helpers ─────────────────────────────────────────────

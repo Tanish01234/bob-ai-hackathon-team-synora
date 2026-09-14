@@ -1,8 +1,18 @@
 import { apiClient } from './client';
+import { fetchWithCache, getCached } from './cache';
 import type { ApiTrackingResponse, ApiSimulationState, ApiDashboardSummary, ApiFleetVessel } from '@/lib/types/api';
 
-export async function getShipmentTracking(shipmentId: string): Promise<ApiTrackingResponse> {
-  return apiClient<ApiTrackingResponse>(`/shipments/${shipmentId}/tracking`);
+export function getCachedShipmentTracking(shipmentId: string): ApiTrackingResponse | null {
+  return getCached<ApiTrackingResponse>(`tracking:${shipmentId}`);
+}
+
+export async function getShipmentTracking(shipmentId: string, forceRefresh = false): Promise<ApiTrackingResponse> {
+  return fetchWithCache<ApiTrackingResponse>(
+    `tracking:${shipmentId}`,
+    () => apiClient<ApiTrackingResponse>(`/shipments/${shipmentId}/tracking`),
+    15_000,
+    forceRefresh
+  );
 }
 
 export async function getFleetTracking(): Promise<ApiFleetVessel[]> {

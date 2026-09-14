@@ -8,9 +8,10 @@ from auth import get_current_user
 from db.queries import get_shipment_raw, get_all_disruptions, get_all_shipments
 from models import RiskResponse
 from services.tracking_service import get_shipment_tracking
-from services.weather_service import get_weather_at_position, get_speed_modifier
+from services.weather_service import get_cached_weather, get_speed_modifier
 from services.risk_service import calculate_risk
 from services.coldchain_service import detect_excursion
+from services.disruption_service import match_shipments
 from services.alert_service import (
     check_and_generate_alerts,
     get_alerts_for_shipment,
@@ -35,14 +36,15 @@ async def get_shipment_risk(shipment_id: str, user_id: str = Depends(get_current
     # Get tracking for position and ETA delay
     tracking = get_shipment_tracking(shipment)
 
-    # Get weather severity
+    # Get weather severity (from fast memory cache if available, non-blocking)
     weather_severity = "normal"
     try:
         lat = tracking.current_position.lat
         lng = tracking.current_position.lng
         if lat != 0 or lng != 0:
-            weather = await get_weather_at_position(lat, lng)
-            weather_severity = weather.severity
+            cached_weather = get_cached_weather(lat, lng)
+            if cached_weather:
+                weather_severity = cached_weather.severity
     except Exception:
         pass
 

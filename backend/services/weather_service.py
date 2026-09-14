@@ -6,6 +6,7 @@ Fetches weather at the shipment's current simulated coordinates.
 Never uses AI for weather data — always real API.
 """
 
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -18,6 +19,15 @@ from models import WeatherResponse
 
 # ── In-memory cache (coordinate-rounded, TTL-based) ──────────
 _weather_cache: dict[str, tuple[float, WeatherResponse]] = {}
+_inflight_weather: dict[str, asyncio.Task] = {}
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+async def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=4.0)
+    return _http_client
 
 
 def _cache_key(lat: float, lng: float) -> str:
@@ -25,11 +35,27 @@ def _cache_key(lat: float, lng: float) -> str:
     return f"{round(lat, 1)}:{round(lng, 1)}"
 
 
+def get_cached_weather(lat: float, lng: float) -> Optional[WeatherResponse]:
+    """
+    Synchronous fast check of in-memory weather cache (<0.01ms).
+    Returns cached weather if present (even slightly stale), or None.
+    Allows tracking/risk endpoints to remain non-blocking.
+    """
+    key = _cache_key(lat, lng)
+    if key in _weather_cache:
+        cached_time, cached_response = _weather_cache[key]
+        settings = get_settings()
+        if time.time() - cached_time < settings.weather_cache_ttl:
+            return cached_response
+        return cached_response  # Stale cached data preferred over blocking
+    return None
+
+
 async def get_weather_at_position(lat: float, lng: float) -> WeatherResponse:
     """
     Fetch current weather at the given coordinates using OpenWeatherMap API.
 
-    Uses caching to avoid excessive API calls.
+    Uses caching and in-flight deduplication to avoid excessive or concurrent duplicate calls.
     Falls back gracefully if API is unavailable.
     """
     settings = get_settings()
@@ -41,34 +67,48 @@ async def get_weather_at_position(lat: float, lng: float) -> WeatherResponse:
         if time.time() - cached_time < settings.weather_cache_ttl:
             return cached_response
 
-    # Fetch from OpenWeatherMap
+    # Deduplicate in-flight requests for identical coordinates
+    if key in _inflight_weather:
+        try:
+            return await _inflight_weather[key]
+        except Exception:
+            pass
+
+    async def _execute_fetch() -> WeatherResponse:
+        try:
+            weather = await _fetch_openweathermap(lat, lng, settings)
+            _weather_cache[key] = (time.time(), weather)
+            return weather
+        except Exception as e:
+            print(f"⚠️  Weather API failed for ({lat}, {lng}): {e}")
+
+            # Return cached data if available (even if stale)
+            if key in _weather_cache:
+                _, stale = _weather_cache[key]
+                return stale
+
+            # Return unknown weather as fallback
+            return WeatherResponse(
+                latitude=lat,
+                longitude=lng,
+                temperature_c=0,
+                wind_speed_kmh=0,
+                wind_gust_kmh=0,
+                precipitation_probability=0,
+                precipitation_mm=0,
+                condition="unknown",
+                severity="normal",
+                humidity=0,
+                visibility_km=0,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+    task = asyncio.create_task(_execute_fetch())
+    _inflight_weather[key] = task
     try:
-        weather = await _fetch_openweathermap(lat, lng, settings)
-        _weather_cache[key] = (time.time(), weather)
-        return weather
-    except Exception as e:
-        print(f"⚠️  Weather API failed for ({lat}, {lng}): {e}")
-
-        # Return cached data if available (even if stale)
-        if key in _weather_cache:
-            _, stale = _weather_cache[key]
-            return stale
-
-        # Return unknown weather as fallback
-        return WeatherResponse(
-            latitude=lat,
-            longitude=lng,
-            temperature_c=0,
-            wind_speed_kmh=0,
-            wind_gust_kmh=0,
-            precipitation_probability=0,
-            precipitation_mm=0,
-            condition="unknown",
-            severity="normal",
-            humidity=0,
-            visibility_km=0,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-        )
+        return await task
+    finally:
+        _inflight_weather.pop(key, None)
 
 
 async def _fetch_openweathermap(lat: float, lng: float, settings) -> WeatherResponse:
@@ -89,10 +129,10 @@ async def _fetch_openweathermap(lat: float, lng: float, settings) -> WeatherResp
         "units": "metric",  # Celsius, m/s
     }
 
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        resp = await client.get(url, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    client = await _get_http_client()
+    resp = await client.get(url, params=params)
+    resp.raise_for_status()
+    data = resp.json()
 
     # Parse OpenWeatherMap response
     main = data.get("main", {})

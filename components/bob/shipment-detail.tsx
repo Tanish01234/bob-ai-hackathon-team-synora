@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 import { CARGO_LABELS, COLD_CHAIN_CARGO, SENSOR_DATA, type Disruption, type Shipment, type SensorData } from '@/lib/bob-data';
 import { ActionChip, Icon, SeverityBadge, StatusBadge } from './primitives';
 import { AnalysisSkeleton, TemperatureMonitor } from './temperature-monitor';
-import { getShipmentTracking } from '@/lib/api/tracking';
-import { getShipmentWeather } from '@/lib/api/weather';
-import { getShipmentRisk } from '@/lib/api/risk';
+import { getShipmentTracking, getCachedShipmentTracking } from '@/lib/api/tracking';
+import { getShipmentWeather, getCachedShipmentWeather } from '@/lib/api/weather';
+import { getShipmentRisk, getCachedShipmentRisk } from '@/lib/api/risk';
 import { getShipmentAIAnalysis } from '@/lib/api/ai';
 import { downloadTransitReceipt } from '@/lib/api/receipts';
 import { TrackingMap } from './tracking-map';
@@ -309,37 +309,44 @@ export function ShipmentDetail({
   const sensor = propSensor !== undefined ? propSensor : SENSOR_DATA[shipment.id];
   const coldChain = COLD_CHAIN_CARGO.includes(shipment.cargo);
 
-  const [tracking, setTracking] = useState<ApiTrackingResponse | null>(null);
-  const [weather, setWeather] = useState<ApiWeatherResponse | null>(null);
-  const [risk, setRisk] = useState<ApiRiskResponse | null>(null);
-  const [trackingLoading, setTrackingLoading] = useState(true);
-  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [tracking, setTracking] = useState<ApiTrackingResponse | null>(() => getCachedShipmentTracking(shipment.id));
+  const [weather, setWeather] = useState<ApiWeatherResponse | null>(() => getCachedShipmentWeather(shipment.id));
+  const [risk, setRisk] = useState<ApiRiskResponse | null>(() => getCachedShipmentRisk(shipment.id));
+  const [trackingLoading, setTrackingLoading] = useState(() => !getCachedShipmentTracking(shipment.id));
+  const [weatherLoading, setWeatherLoading] = useState(() => !getCachedShipmentWeather(shipment.id));
 
   useEffect(() => {
     let cancelled = false;
 
-    // Fetch tracking
-    setTrackingLoading(true);
+    // Fast-check cache for instant display
+    const cachedT = getCachedShipmentTracking(shipment.id);
+    const cachedW = getCachedShipmentWeather(shipment.id);
+    const cachedR = getCachedShipmentRisk(shipment.id);
+
+    setTracking(cachedT);
+    setWeather(cachedW);
+    setRisk(cachedR);
+    setTrackingLoading(!cachedT);
+    setWeatherLoading(!cachedW);
+
+    // Parallel fetch of live tracking, weather, and risk
     getShipmentTracking(shipment.id)
       .then(data => { if (!cancelled) setTracking(data); })
       .catch(err => console.warn('Tracking failed:', err))
       .finally(() => { if (!cancelled) setTrackingLoading(false); });
 
-    // Fetch weather
-    setWeatherLoading(true);
     getShipmentWeather(shipment.id)
       .then(data => { if (!cancelled) setWeather(data); })
       .catch(err => console.warn('Weather failed:', err))
       .finally(() => { if (!cancelled) setWeatherLoading(false); });
 
-    // Fetch risk
     getShipmentRisk(shipment.id)
       .then(data => { if (!cancelled) setRisk(data); })
       .catch(err => console.warn('Risk failed:', err));
 
     // Auto-refresh tracking every 10 seconds
     const interval = setInterval(() => {
-      getShipmentTracking(shipment.id)
+      getShipmentTracking(shipment.id, true)
         .then(data => { if (!cancelled) setTracking(data); })
         .catch(() => {});
     }, 10_000);

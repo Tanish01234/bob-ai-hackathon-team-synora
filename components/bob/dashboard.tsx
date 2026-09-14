@@ -11,10 +11,9 @@ import { ShipmentDetail } from './shipment-detail';
 import { ensureAuthSession, getAuthState, logoutUser, subscribeAuth, type AuthStatus } from '@/lib/auth-bootstrap';
 import { getStats } from '@/lib/api/stats';
 import { getDisruptions, matchDisruption } from '@/lib/api/disruptions';
-import { getShipmentSensorCheck } from '@/lib/api/shipments';
+import { getShipmentSensorCheck, getShipmentById, prefetchShipmentData } from '@/lib/api/shipments';
 import { getSimulationState } from '@/lib/api/tracking';
 import { mapStats, mapDisruption, mapShipment, mapSensorCheck, type DashboardStats } from '@/lib/api/mappers';
-import { getShipmentById } from '@/lib/api/shipments';
 import { AlertCenter } from './alert-center';
 import { BobAssistantPanel } from './bob-assistant-panel';
 import { GuidedDemoProvider, useGuidedDemo } from './guided-demo';
@@ -432,6 +431,7 @@ export function BobDashboard() {
 
   async function selectShipment(shipment: Shipment) {
     if (timer.current) clearTimeout(timer.current);
+    prefetchShipmentData(shipment.id);
     setSelectedShipment(shipment);
     setMobileView('detail');
     detailRef.current?.scrollTo({ top: 0 });
@@ -458,6 +458,7 @@ export function BobDashboard() {
   }
 
   async function handleSelectShipmentById(shipmentId: string) {
+    prefetchShipmentData(shipmentId);
     // 1. Check if shipment is already in affectedShipmentsMap
     for (const [dId, sList] of Object.entries(affectedShipmentsMap)) {
       const found = sList.find((s) => s.id === shipmentId);

@@ -13,6 +13,7 @@ Position is calculated deterministically from:
 
 import json
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -22,16 +23,43 @@ from data.constants import COORDINATES
 
 # ── Simulation Clock ─────────────────────────────────────────
 
+_simulation_state_cache: Optional[tuple[float, dict]] = None
+SIMULATION_STATE_TTL = 5.0  # seconds
+
+
+def invalidate_simulation_cache() -> None:
+    """Invalidate cached simulation state."""
+    global _simulation_state_cache
+    _simulation_state_cache = None
+
+
 def get_simulation_state() -> dict:
     """
-    Read the current simulation state from the database.
+    Read the current simulation state from the database (cached for 5s).
     Returns dict with is_running, speed_multiplier, current simulation time.
     """
+    global _simulation_state_cache
+    now_ts = time.time()
+    if _simulation_state_cache is not None:
+        cached_ts, cached_row = _simulation_state_cache
+        if now_ts - cached_ts < SIMULATION_STATE_TTL:
+            sim_time = _calculate_sim_time(cached_row)
+            return {
+                "id": cached_row["id"],
+                "is_running": cached_row.get("is_running", True),
+                "speed_multiplier": cached_row.get("speed_multiplier", 1.0),
+                "current_time": sim_time.isoformat(),
+                "base_time": cached_row.get("base_time"),
+                "wall_time_at_base": cached_row.get("wall_time_at_base"),
+                "paused_at": cached_row.get("paused_at"),
+            }
+
     sb = get_supabase()
     try:
         result = sb.table("simulation_state").select("*").limit(1).execute()
         if result.data:
             row = result.data[0]
+            _simulation_state_cache = (now_ts, row)
             sim_time = _calculate_sim_time(row)
             return {
                 "id": row["id"],
@@ -116,6 +144,7 @@ def pause_simulation() -> dict:
         "updated_at": now.isoformat(),
     }).eq("id", state["id"]).execute()
 
+    invalidate_simulation_cache()
     return get_simulation_state()
 
 
@@ -137,6 +166,7 @@ def resume_simulation() -> dict:
         "updated_at": now.isoformat(),
     }).eq("id", state["id"]).execute()
 
+    invalidate_simulation_cache()
     return get_simulation_state()
 
 
@@ -154,6 +184,7 @@ def set_simulation_speed(multiplier: float) -> dict:
         "updated_at": now.isoformat(),
     }).eq("id", state["id"]).execute()
 
+    invalidate_simulation_cache()
     return get_simulation_state()
 
 
@@ -174,6 +205,7 @@ def reset_simulation() -> dict:
         "updated_at": now.isoformat(),
     }).eq("id", state["id"]).execute()
 
+    invalidate_simulation_cache()
     return get_simulation_state()
 
 
