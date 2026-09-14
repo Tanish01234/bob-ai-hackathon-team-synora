@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 import type { RouteSegment, TrackingResponse, AlternativeRoute } from "@/lib/types/api";
+import { getMapTileConfig } from "@/lib/map-config";
 
 interface TrackingMapProps {
   tracking: TrackingResponse | null;
@@ -46,14 +47,9 @@ export function TrackingMap({
         // Add custom zoom control in bottom right
         L.control.zoom({ position: "bottomright" }).addTo(map);
 
-        // Add sleek CartoDB Dark Matter tiles
-        L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          {
-            maxZoom: 19,
-            subdomains: "abcd",
-          }
-        ).addTo(map);
+        // Add sleek dark maritime tiles (clean fallback or configured provider)
+        const tileConfig = getMapTileConfig();
+        L.tileLayer(tileConfig.url, tileConfig.options).addTo(map);
 
         const layerGroup = L.layerGroup().addTo(map);
         mapInstanceRef.current = map;

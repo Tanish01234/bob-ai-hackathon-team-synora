@@ -104,10 +104,15 @@ export interface ApiSensorCheckResponse {
 
 export interface ApiStatsResponse {
   total_shipments: number;
+  in_transit?: number;
+  delayed?: number;
+  delivered?: number;
+  active_disruptions?: number;
   disruption_affected: number;
   cold_chain_alerts: {
     critical: number;
     moderate: number;
+    total?: number;
   };
 }
 

@@ -49,7 +49,7 @@ export function GuidedDemoComplete({
                 BOB Guided Demo Complete
               </h2>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                Supply Chain Intelligence Verified
+                Supply Chain Intelligence · <span className="text-cyan-400/80">by Team Synora</span>
               </p>
             </div>
           </div>

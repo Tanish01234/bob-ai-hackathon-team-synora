@@ -13,7 +13,7 @@ import { getStats } from '@/lib/api/stats';
 import { getDisruptions, matchDisruption } from '@/lib/api/disruptions';
 import { getShipmentSensorCheck } from '@/lib/api/shipments';
 import { getSimulationState } from '@/lib/api/tracking';
-import { mapStats, mapDisruption, mapShipment, mapSensorCheck } from '@/lib/api/mappers';
+import { mapStats, mapDisruption, mapShipment, mapSensorCheck, type DashboardStats } from '@/lib/api/mappers';
 import { getShipmentById } from '@/lib/api/shipments';
 import { AlertCenter } from './alert-center';
 import { BobAssistantPanel } from './bob-assistant-panel';
@@ -40,15 +40,38 @@ function Topbar({
   onLogout,
   simulationState,
   onSelectShipment,
+  userEmail,
 }: {
   stats: typeof STATS;
   onLogout?: () => void;
   simulationState?: ApiSimulationState | null;
   onSelectShipment?: (shipmentId: string) => void;
+  userEmail?: string | null;
 }) {
+  const isDemoUser = userEmail === (process.env.NEXT_PUBLIC_DEMO_EMAIL || 'judge@bob.ai');
   return <header className="z-50 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border bg-panel px-4 py-3 md:h-16 md:flex-nowrap md:px-6 md:py-0">
-    <div className="flex shrink-0 items-center gap-2.5"><BobMark /><div className="flex items-baseline gap-3 md:flex-col md:gap-0"><span className="text-[21px] font-bold leading-6 tracking-[-0.04em]">Bob</span><span className="text-[11px] leading-4 text-muted-foreground">Supply Chain Intelligence</span></div></div>
+    <div className="flex shrink-0 items-center gap-2.5">
+      <BobMark />
+      <div className="flex flex-col justify-center">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[20px] font-bold leading-5 tracking-[-0.04em] text-white">BOB</span>
+          <span className="text-[11px] font-medium leading-4 text-muted-foreground">Supply Chain Intelligence</span>
+        </div>
+        <span className="text-[9px] font-mono tracking-wider text-cyan-400/80">by Team Synora</span>
+      </div>
+    </div>
     <div className="ml-auto flex items-center gap-2">
+      {/* Demo Mode Badge */}
+      {isDemoUser && (
+        <div
+          className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-mono text-amber-300 font-semibold shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+          title="Logged in as BOB Hackathon Judge Demo Account"
+        >
+          <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span>JUDGE DEMO</span>
+        </div>
+      )}
+
       {/* Simulation status pill */}
       <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-border bg-background/40 px-2.5 py-1 text-[10px] text-muted-foreground">
         <span className={cn('size-1.5 rounded-full', simulationState?.is_running ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400')} />
@@ -68,18 +91,19 @@ function Topbar({
       {/* Guided Demo Button */}
       <GuidedDemoButton />
 
-      {/* Admin Link */}
+      {/* Operations Center Link */}
       <Link
         href="/admin"
         data-tour="admin-link"
         className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] text-primary transition-colors hover:bg-primary/20 cursor-pointer font-medium"
+        title="Enterprise Operations Center"
       >
-        <Icon name="activity" className="size-3" />
-        <span className="hidden sm:inline">Admin</span>
+        <Icon name="network" className="size-3" />
+        <span className="hidden sm:inline">Operations Center</span>
       </Link>
 
       {/* Alert Center */}
-      <AlertCenter onSelectShipment={onSelectShipment} />
+      <AlertCenter onSelectShipment={onSelectShipment} userEmail={userEmail || undefined} />
 
       {onLogout && (
         <button
@@ -99,31 +123,210 @@ function Topbar({
   </header>;
 }
 
-function EmptyWorkspace({ disruption }: { disruption: Disruption | null }) {
-  return <div className="mx-auto flex min-h-full w-full max-w-[1180px] flex-col">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
-      <div><div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground"><Icon name="network" className="size-3.5" />Operations<Icon name="chevron" className="size-3 text-subtle" /><span className="text-foreground">Shipment intelligence</span></div><h1 className="mt-5 text-[20px] font-semibold tracking-tight">Your supply chain, in focus.</h1><p className="mt-1.5 text-[12px] text-muted-foreground">Monitor disruptions. Protect your cargo. Make the next move.</p></div>
-      <span className="hidden items-center gap-1.5 self-end pb-1 text-[10px] text-muted-foreground lg:flex"><Icon name="shield" className="size-3.5 text-success" />Network overview</span>
+function EmptyWorkspace({
+  disruption,
+  stats,
+  simulationState,
+}: {
+  disruption: Disruption | null;
+  stats: DashboardStats;
+  simulationState: ApiSimulationState | null;
+}) {
+  return (
+    <div className="mx-auto flex min-h-full w-full max-w-[1180px] flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Icon name="network" className="size-3.5 text-cyan-400" />
+            Operations
+            <Icon name="chevron" className="size-3 text-subtle" />
+            <span className="text-foreground">Shipment intelligence</span>
+          </div>
+          <h1 className="mt-5 text-[20px] font-semibold tracking-tight">Your supply chain, in focus.</h1>
+          <p className="mt-1.5 text-[12px] text-muted-foreground">
+            Monitor disruptions. Protect your cargo. Make the next move.
+          </p>
+        </div>
+        <span className="hidden items-center gap-1.5 self-end pb-1 text-[10px] text-muted-foreground lg:flex">
+          <Icon name="shield" className="size-3.5 text-success" />
+          Network overview
+        </span>
+      </div>
+
+      <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center py-8 text-center">
+        <div className="relative mb-6 flex size-32 shrink-0 items-center justify-center rounded-full border border-border/50">
+          <span className="absolute inset-2.5 rounded-full border border-dashed border-border/70" />
+          <span className="relative flex size-20 items-center justify-center rounded-full border border-border bg-panel">
+            <Globe className="size-16 text-[#2A4070]" />
+          </span>
+          <span className="absolute right-1 top-4 flex size-6 items-center justify-center rounded-lg border border-primary/20 bg-panel">
+            <Icon name="box" className="size-3 text-primary" />
+          </span>
+          <span className="absolute bottom-3 left-0 flex size-5 items-center justify-center rounded-md border border-border bg-panel">
+            <Icon name="network" className="size-2.5 text-muted-foreground" />
+          </span>
+        </div>
+        <span className="mb-2.5 rounded-md border border-border bg-panel px-2 py-0.5 text-[10px] text-muted-foreground">
+          Shipment workspace
+        </span>
+        <h2 className="text-[17px] font-semibold tracking-tight">Select a shipment</h2>
+        <p className="mt-2 max-w-[320px] text-[12px] leading-[1.7] text-muted-foreground">
+          {disruption
+            ? `Choose an affected shipment under ${disruption.location} to explore its route, risk, and cargo health.`
+            : 'Click a disruption, then choose an affected shipment to view details.'}
+        </p>
+        <div className="mt-5 flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'flex size-4 items-center justify-center rounded-full border font-mono text-[9px]',
+                disruption ? 'border-success/30 bg-success/10 text-success' : 'border-primary/30 bg-primary/10 text-primary'
+              )}
+            >
+              {disruption ? <Icon name="check" className="size-2.5" /> : '1'}
+            </span>
+            Select disruption
+          </span>
+          <Icon name="arrow" className="size-3 text-subtle" />
+          <span className={cn('flex items-center gap-1.5', disruption && 'text-primary')}>
+            <span
+              className={cn(
+                'flex size-4 items-center justify-center rounded-full border font-mono text-[9px]',
+                disruption ? 'border-primary/30 bg-primary/10' : 'border-border'
+              )}
+            >
+              2
+            </span>
+            Explore shipment
+          </span>
+        </div>
+      </div>
+
+      {/* Operations Center / Operational Intelligence Section */}
+      <div className="mb-6 space-y-2.5">
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-2">
+            <span className="flex size-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Operational Intelligence
+            </span>
+          </div>
+          <Link
+            href="/admin"
+            className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium hover:underline flex items-center gap-1"
+          >
+            Operations Center <Icon name="chevron" className="size-2.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {/* Card 1: Fleet Operations */}
+          <div className="flex flex-col justify-between rounded-xl border border-border bg-[#131E35]/60 p-4 transition-all hover:border-primary/40 hover:bg-[#131E35]/90">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
+                    <Icon name="network" className="size-3.5" />
+                  </span>
+                  <h3 className="text-[13px] font-semibold text-white">Fleet Operations</h3>
+                </div>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+                  {stats.total || 250} Total
+                </span>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+                <span className="font-semibold text-slate-200">{stats.inTransit ?? 188}</span> in transit ·{' '}
+                <span className="font-semibold text-amber-300">{stats.delayed ?? 36}</span> delayed
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">Global fleet roster</span>
+              <Link
+                href="/admin?tab=shipments"
+                className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors"
+              >
+                Open Operations →
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 2: Disruption Intelligence */}
+          <div className="flex flex-col justify-between rounded-xl border border-border bg-[#131E35]/60 p-4 transition-all hover:border-warning/40 hover:bg-[#131E35]/90">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-lg border border-warning/30 bg-warning/10 text-warning">
+                    <Icon name="warning" className="size-3.5" />
+                  </span>
+                  <h3 className="text-[13px] font-semibold text-white">Disruption Intelligence</h3>
+                </div>
+                <span className="rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[10px] font-bold text-warning">
+                  {stats.affected || 12} Active
+                </span>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+                Risk visibility across affected shipments and alternative routing recommendations.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">{stats.affected || 12} active events</span>
+              <Link
+                href="/admin?tab=disruptions"
+                className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning/20 transition-colors"
+              >
+                View Disruptions →
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 3: Simulation Engine */}
+          <div className="flex flex-col justify-between rounded-xl border border-border bg-[#131E35]/60 p-4 transition-all hover:border-emerald-500/40 hover:bg-[#131E35]/90">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                    <Icon name="activity" className="size-3.5" />
+                  </span>
+                  <h3 className="text-[13px] font-semibold text-white">Simulation Engine</h3>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {simulationState?.is_running ? 'Running' : 'Active'}
+                </span>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+                Authoritative temporal clock running at{' '}
+                <span className="font-semibold text-slate-200">{simulationState?.speed_multiplier || 1}×</span> speed multiplier.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">Physics engine</span>
+              <Link
+                href="/admin?tab=simulation"
+                className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+              >
+                Open Simulation →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-3 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Icon name="shield" className="size-3 text-cyan-400" />
+          BOB Supply Chain Intelligence · <span className="font-medium text-cyan-400/80">by Team Synora</span>
+        </span>
+        <span className="font-mono text-[9px] text-slate-500">v2.4-prod-judge</span>
+      </div>
     </div>
-    <div className="flex min-h-[450px] flex-1 flex-col items-center justify-center py-10 text-center">
-      <div className="relative mb-7 flex size-36 shrink-0 items-center justify-center rounded-full border border-border/50"><span className="absolute inset-3 rounded-full border border-dashed border-border/70" /><span className="relative flex size-24 items-center justify-center rounded-full border border-border bg-panel"><Globe className="size-20 text-[#2A4070]" /></span><span className="absolute right-2 top-5 flex size-7 items-center justify-center rounded-lg border border-primary/20 bg-panel"><Icon name="box" className="size-3.5 text-primary" /></span><span className="absolute bottom-4 left-0 flex size-6 items-center justify-center rounded-md border border-border bg-panel"><Icon name="network" className="size-3 text-muted-foreground" /></span></div>
-      <span className="mb-3 rounded-md border border-border bg-panel px-2 py-0.5 text-[10px] text-muted-foreground">Shipment workspace</span>
-      <h2 className="text-[18px] font-semibold tracking-tight">Select a shipment</h2>
-      <p className="mt-2.5 max-w-[280px] text-[13px] leading-[1.8] text-muted-foreground">{disruption ? `Choose an affected shipment under ${disruption.location} to explore its route, risk, and cargo health.` : 'Click a disruption, then choose an affected shipment to view details.'}</p>
-      <div className="mt-6 flex items-center gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1.5"><span className={cn('flex size-4 items-center justify-center rounded-full border font-mono text-[9px]', disruption ? 'border-success/30 bg-success/10 text-success' : 'border-primary/30 bg-primary/10 text-primary')}>{disruption ? <Icon name="check" className="size-2.5" /> : '1'}</span>Select disruption</span><Icon name="arrow" className="size-3 text-subtle" /><span className={cn('flex items-center gap-1.5', disruption && 'text-primary')}><span className={cn('flex size-4 items-center justify-center rounded-full border font-mono text-[9px]', disruption ? 'border-primary/30 bg-primary/10' : 'border-border')}>2</span>Explore shipment</span></div>
-    </div>
-    <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <div className="flex items-start gap-3 rounded-[10px] border border-border bg-panel p-4"><span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card"><Icon name="network" className="text-primary" /></span><div><h3 className="text-[12px] font-medium">Disruption visibility</h3><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">See the events impacting your shipments.</p></div></div>
-      <div className="flex items-start gap-3 rounded-[10px] border border-border bg-panel p-4"><span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card"><Icon name="thermometer" className="text-success" /></span><div><h3 className="text-[12px] font-medium">Cold chain monitoring</h3><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Catch excursions before cargo is compromised.</p></div></div>
-      <div className="flex items-start gap-3 rounded-[10px] border border-border bg-panel p-4"><span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card"><Icon name="sparkle" className="text-warning" /></span><div><h3 className="text-[12px] font-medium">Intelligent response</h3><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Turn shipment risks into clear next steps.</p></div></div>
-    </div>
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1.5"><Icon name="shield" className="size-3" />Built for a more resilient supply chain</span><span></span></div>
-  </div>;
+  );
 }
 
 export function BobDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(STATS);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [affectedShipmentsMap, setAffectedShipmentsMap] = useState<Record<string, Shipment[]>>({});
   const [sensorDataMap, setSensorDataMap] = useState<Record<string, SensorData>>({});
@@ -138,6 +341,13 @@ export function BobDashboard() {
   const detailRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setUserEmail(data.user.email);
+      }
+    });
+
     getStats()
       .then((data) => setStats(mapStats(data)))
       .catch((err) => {
@@ -268,19 +478,30 @@ export function BobDashboard() {
     }
   }
 
+  // Handle ?shipment= query parameter on mount or navigation
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const shipParam = params.get('shipment');
+      if (shipParam) {
+        handleSelectShipmentById(shipParam);
+      }
+    }
+  }, [disruptions]);
+
   const tourStats = {
     total: stats.total,
-    inTransit: Math.max(0, stats.total - stats.affected - 12),
-    delayed: stats.affected,
-    delivered: 12,
-    disruptions: disruptions.length || 12,
+    inTransit: stats.inTransit ?? 188,
+    delayed: stats.delayed ?? 36,
+    delivered: stats.delivered ?? 26,
+    disruptions: stats.affected || disruptions.length || 12,
   };
 
   return (
     <GuidedDemoProvider stats={tourStats}>
       <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background relative">
         <a href="#shipment-workspace" className="sr-only z-[60] rounded-lg bg-primary p-3 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4" onClick={() => setMobileView('detail')}>Skip to shipment workspace</a>
-        <Topbar stats={stats} onLogout={handleLogout} simulationState={simulationState} onSelectShipment={handleSelectShipmentById} />
+        <Topbar stats={stats} onLogout={handleLogout} simulationState={simulationState} onSelectShipment={handleSelectShipmentById} userEmail={userEmail} />
         <nav aria-label="Dashboard panels" className="grid shrink-0 grid-cols-2 border-b border-border bg-panel md:hidden"><button type="button" aria-pressed={mobileView === 'feed'} onClick={() => setMobileView('feed')} className={cn('flex items-center justify-center gap-2 border-b-2 px-4 py-3 text-[12px]', mobileView === 'feed' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}><Icon name="activity" className="size-3.5" />Disruptions</button><button type="button" aria-pressed={mobileView === 'detail'} onClick={() => setMobileView('detail')} className={cn('flex items-center justify-center gap-2 border-b-2 px-4 py-3 text-[12px]', mobileView === 'detail' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground')}><Icon name="box" className="size-3.5" />Shipment details</button></nav>
         <div className="flex min-h-0 flex-1">
           <aside aria-label="Disruption feed" className={cn('w-full shrink-0 flex-col overflow-hidden border-r border-border bg-panel md:flex md:w-80', mobileView === 'feed' ? 'flex' : 'hidden')}>
@@ -306,7 +527,7 @@ export function BobDashboard() {
                 sensor={sensorDataMap[selectedShipment.id]}
               />
             ) : (
-              <EmptyWorkspace disruption={selectedDisruption} />
+              <EmptyWorkspace disruption={selectedDisruption} stats={stats} simulationState={simulationState} />
             )}
           </main>
         </div>

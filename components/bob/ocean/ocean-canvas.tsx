@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import type { VesselState, WeatherZone, DisruptionZone, MapLayersConfig, ZoomPreset } from "./types";
 import { MARITIME_WEATHER_ZONES, MARITIME_DISRUPTIONS, ZOOM_LEVEL_MAP, RISK_COLOR_HEX } from "./constants";
 import type { RouteSegment, AlternativeRoute } from "@/lib/types/api";
+import { getMapTileConfig } from "@/lib/map-config";
 
 interface OceanCanvasProps {
   vessels: VesselState[];
@@ -70,14 +71,9 @@ export function OceanCanvas({
         attributionControl: false,
       });
 
-      // Sleek CartoDB Dark Matter tiles
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        {
-          maxZoom: 19,
-          subdomains: "abcd",
-        }
-      ).addTo(map);
+      // Sleek dark maritime tiles (clean keyless fallback or configured provider)
+      const tileConfig = getMapTileConfig();
+      L.tileLayer(tileConfig.url, tileConfig.options).addTo(map);
 
       // Layer groups for clean management
       weatherGroupRef.current = L.layerGroup().addTo(map);

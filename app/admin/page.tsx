@@ -59,6 +59,26 @@ export default function AdminPage() {
   // AI Activity tab state
   const [aiActivityList, setAiActivityList] = useState<any[]>([]);
 
+  // Synchronize tab state with URL query parameter (?tab=...)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const initialTab = params.get('tab') as Tab | null;
+      if (initialTab && ['overview', 'shipments', 'disruptions', 'simulation', 'demo', 'ai_activity'].includes(initialTab)) {
+        setTab(initialTab);
+      }
+    }
+  }, []);
+
+  const handleSelectTab = (selectedTab: Tab) => {
+    setTab(selectedTab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', selectedTab);
+      window.history.replaceState(null, '', url.toString());
+    }
+  };
+
   const flash = (msg: string) => {
     setActionMsg(msg);
     setTimeout(() => setActionMsg(null), 3500);
@@ -200,12 +220,15 @@ export default function AdminPage() {
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-400 font-bold">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 font-bold">
               ✦
             </div>
             <div>
-              <h1 className="text-sm font-semibold tracking-tight text-white">Bob Admin Console</h1>
-              <p className="text-[10px] text-slate-400">Simulation Control & Fleet Intelligence Operations</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-semibold tracking-tight text-white">Operations Center</h1>
+                <span className="text-[9px] font-mono text-cyan-400/80">by Team Synora</span>
+              </div>
+              <p className="text-[10px] text-slate-400">Enterprise Fleet Intelligence, Disruption Control & Simulation Operations</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -226,15 +249,15 @@ export default function AdminPage() {
 
         {/* Tab Navigation */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <nav className="flex gap-1 overflow-x-auto">
+          <nav className="flex gap-1 overflow-x-auto" aria-label="Operations Center Tabs">
             {tabs.map((t) => (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => handleSelectTab(t.id)}
                 className={cn(
                   'px-3.5 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap',
                   tab === t.id
-                    ? 'border-blue-500 text-blue-400 font-semibold'
+                    ? 'border-cyan-500 text-cyan-400 font-semibold'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 )}
               >

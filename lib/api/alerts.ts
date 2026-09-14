@@ -19,3 +19,9 @@ export async function getAlerts(): Promise<ApiAlert[]> {
 export async function getShipmentAlerts(shipmentId: string): Promise<ApiAlert[]> {
   return apiClient<ApiAlert[]>(`/shipments/${shipmentId}/alerts`);
 }
+
+export async function resolveAlert(alertId: string): Promise<{ status: string; resolved: boolean }> {
+  return apiClient<{ status: string; resolved: boolean }>(`/alerts/${alertId}/resolve`, {
+    method: 'POST',
+  });
+}

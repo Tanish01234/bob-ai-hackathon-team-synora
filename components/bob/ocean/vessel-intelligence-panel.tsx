@@ -268,10 +268,9 @@ export function VesselIntelligencePanel({
           </button>
 
           <Link
-            href={`/dashboard/shipments/${shipmentId}`}
-            target="_blank"
+            href={`/?shipment=${shipmentId}`}
             className="p-1.5 rounded-lg hover:bg-[#1E2D4A] text-slate-400 hover:text-white transition-colors"
-            title="Open full shipment details page"
+            title="Open shipment workspace"
           >
             <ExternalLink className="w-4 h-4" />
           </Link>

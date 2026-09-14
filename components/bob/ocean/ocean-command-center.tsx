@@ -213,7 +213,7 @@ export function OceanCommandCenter({ initialShipmentId }: OceanCommandCenterProp
         {/* Left Branding & Live Sync status */}
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-[#162038] text-slate-400 hover:text-white text-xs font-mono transition-colors"
             title="Return to operational dashboard"
           >
@@ -232,6 +232,9 @@ export function OceanCommandCenter({ initialShipmentId }: OceanCommandCenterProp
                 <span className="text-xs font-bold text-white tracking-widest font-mono">BOB AI</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-mono font-semibold">
                   OCEAN INTELLIGENCE
+                </span>
+                <span className="hidden lg:inline text-[9px] font-mono text-cyan-400/80">
+                  by Team Synora
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono hidden sm:block">

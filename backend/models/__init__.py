@@ -233,7 +233,9 @@ class StatsResponse(BaseModel):
     total_shipments: int
     in_transit: Optional[int] = None
     delayed: Optional[int] = None
+    delivered: Optional[int] = None
     at_risk: Optional[int] = None
+    active_disruptions: Optional[int] = None
     disruption_affected: int
     weather_alerts: Optional[int] = None
     cold_chain_alerts: dict

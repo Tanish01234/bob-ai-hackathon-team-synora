@@ -80,7 +80,7 @@ async def admin_overview(user_id: str = Depends(get_admin_user)):
         "at_risk": len(affected_ids),
         "active_disruptions": len(disruptions),
         "affected_shipments": len(affected_ids),
-        "disruption_alerts": len(affected_ids),
+        "disruption_alerts": len(disruptions),
         "weather_alerts": alert_counts.get("high", 0) + alert_counts.get("critical", 0),
         "cold_chain_alerts": cc_stats.get("critical", 0) + cc_stats.get("moderate", 0),
         "critical_alerts": alert_counts.get("critical", 0) + cc_stats.get("critical", 0),

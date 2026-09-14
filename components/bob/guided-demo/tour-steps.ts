@@ -126,7 +126,7 @@ export const TOUR_STEPS: TourStep[] = [
     stepNumber: 12,
     title: '11. Control the Demo & Export Documentation',
     description:
-      'The Admin Console gives you control over simulation speeds (1x to 100x), demo scenario triggers, and real-time AI audit logs. You can also export audit-grade Transit Receipt PDFs with one click.',
+      'The Operations Center gives you control over simulation speeds (1x to 100x), fleet operations, and demo scenario triggers. You can also export audit-grade Transit Receipt PDFs with one click.',
     targetSelector: '[data-tour="admin-link"]',
     preferredPlacement: 'bottom',
     quickMode: true,

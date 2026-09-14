@@ -91,7 +91,7 @@ export const SENSOR_DATA: Record<string, SensorData> = {
   },
 };
 
-export const STATS = { total: 200, affected: 34, critical: 4, moderate: 5 };
+export const STATS = { total: 250, inTransit: 188, delayed: 36, delivered: 26, affected: 12, critical: 8, moderate: 12 };
 export const DEMO_ETA = 'Sep 20';
 export const CARGO_LABELS = { vaccine: 'Vaccine', electronics: 'Electronics', standard: 'Standard', perishable: 'Perishable', frozen_goods: 'Frozen goods' };
 export const ACTION_LABELS = { reroute: 'Reroute', hold: 'Hold', alternate_carrier: 'Alt. carrier' };

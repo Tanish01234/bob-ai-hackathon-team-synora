@@ -13,14 +13,15 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react';
-import { getAlerts, type ApiAlert } from '@/lib/api/alerts';
+import { getAlerts, resolveAlert, type ApiAlert } from '@/lib/api/alerts';
 
 interface AlertCenterProps {
   onSelectShipment?: (shipmentId: string) => void;
   activeDisruptionCount?: number;
+  userEmail?: string;
 }
 
-export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: AlertCenterProps) {
+export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0, userEmail }: AlertCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
@@ -28,20 +29,24 @@ export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: Ale
   const [isLoading, setIsLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Load resolved IDs from localStorage
+  const storageKey = userEmail ? `bob-resolved-alerts-${userEmail}` : 'bob-resolved-alerts-default';
+
+  // Load resolved IDs from user-scoped localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('bob-resolved-alerts');
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         setResolvedIds(new Set(JSON.parse(saved)));
+      } else {
+        setResolvedIds(new Set());
       }
     } catch {}
-  }, []);
+  }, [storageKey]);
 
   const saveResolvedIds = (newSet: Set<string>) => {
     setResolvedIds(newSet);
     try {
-      localStorage.setItem('bob-resolved-alerts', JSON.stringify(Array.from(newSet)));
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(newSet)));
     } catch {}
   };
 
@@ -49,7 +54,18 @@ export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: Ale
     setIsLoading(true);
     getAlerts()
       .then((data) => {
-        setAlerts(data || []);
+        const rawAlerts = data || [];
+        setAlerts(rawAlerts);
+        const dbAcknowledged = rawAlerts
+          // @ts-ignore - backend may return acknowledged
+          .filter((a) => a.acknowledged || a.resolved)
+          .map((a) => a.alert_id || a.id || `${a.shipment_id}-${a.type}`);
+        if (dbAcknowledged.length > 0) {
+          setResolvedIds((prev) => {
+            const merged = new Set([...Array.from(prev), ...dbAcknowledged]);
+            return merged;
+          });
+        }
       })
       .catch((err) => {
         console.error('Failed to load alerts:', err);
@@ -85,15 +101,23 @@ export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: Ale
 
   const criticalCount = activeAlerts.filter((a) => a.severity === 'critical' || a.severity === 'high').length;
 
-  const handleToggleResolve = (id: string, e: React.MouseEvent) => {
+  const handleToggleResolve = (id: string, e: React.MouseEvent, rawAlert?: ApiAlert) => {
     e.stopPropagation();
     const next = new Set(resolvedIds);
+    const isResolving = !next.has(id);
     if (next.has(id)) {
       next.delete(id);
     } else {
       next.add(id);
     }
     saveResolvedIds(next);
+
+    const backendId = rawAlert?.id || rawAlert?.alert_id;
+    if (backendId && isResolving) {
+      resolveAlert(backendId).catch((err) => {
+        console.warn('Could not sync alert resolve to backend:', err);
+      });
+    }
   };
 
   const handleClearAll = () => {
@@ -101,6 +125,10 @@ export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: Ale
     alerts.forEach((a) => {
       const id = a.alert_id || a.id || `${a.shipment_id}-${a.type}`;
       next.add(id);
+      const backendId = a.id || a.alert_id;
+      if (backendId) {
+        resolveAlert(backendId).catch(() => {});
+      }
     });
     saveResolvedIds(next);
   };
@@ -270,7 +298,7 @@ export function AlertCenter({ onSelectShipment, activeDisruptionCount = 0 }: Ale
                       <div className="mt-1 flex items-center justify-between text-[9px] text-slate-500">
                         <span>{new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         <button
-                          onClick={(e) => handleToggleResolve(id, e)}
+                          onClick={(e) => handleToggleResolve(id, e, alert)}
                           className="text-blue-400 hover:text-blue-300 font-medium hover:underline"
                         >
                           {isResolved ? 'Reopen' : 'Mark Resolved'}

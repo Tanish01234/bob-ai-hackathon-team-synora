@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 
 from auth import get_current_user
 from db.queries import (
+    count_shipments_by_status,
     get_all_disruptions,
     get_all_shipments,
     get_cold_chain_stats,
@@ -24,6 +25,7 @@ async def get_stats(user_id: str = Depends(get_current_user)):
     """
     shipments = get_all_shipments(user_id)
     disruptions = get_all_disruptions(user_id)
+    status_counts = count_shipments_by_status(user_id)
 
     # Count disruption-affected shipments across all disruptions
     affected_ids: set[str] = set()
@@ -36,9 +38,17 @@ async def get_stats(user_id: str = Depends(get_current_user)):
     critical_count = cold_chain_counts["critical"]
     moderate_count = cold_chain_counts["moderate"]
 
+    # Canonical active disruption event count
+    active_disruptions_count = len(disruptions)
+
     return StatsResponse(
         total_shipments=len(shipments),
-        disruption_affected=len(affected_ids),
+        in_transit=status_counts.get("in_transit", 0),
+        delayed=status_counts.get("delayed", 0),
+        delivered=status_counts.get("delivered", 0),
+        at_risk=len(affected_ids),
+        active_disruptions=active_disruptions_count,
+        disruption_affected=active_disruptions_count,
         cold_chain_alerts={
             "critical": critical_count,
             "moderate": moderate_count,

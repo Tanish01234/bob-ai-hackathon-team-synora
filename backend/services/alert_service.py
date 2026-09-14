@@ -153,8 +153,64 @@ def get_alerts_for_shipment(user_id: str, shipment_id: str, limit: int = 20) -> 
         return []
 
 
+def bootstrap_alerts_for_user(user_id: str):
+    """Seed canonical alerts for a new or demo user if none exist."""
+    now = datetime.now(timezone.utc).isoformat()
+    alerts_to_seed = [
+        {
+            "user_id": user_id,
+            "shipment_id": "SHP-1042",
+            "type": "disruption",
+            "severity": "medium",
+            "title": "Disruption affects shipment route",
+            "message": "Active disruption affecting shipment route. Review recommended.",
+            "recommended_action": "review_route",
+            "acknowledged": False,
+            "created_at": now,
+        },
+        {
+            "user_id": user_id,
+            "shipment_id": "SHP-1015",
+            "type": "cold_chain",
+            "severity": "critical",
+            "title": "Critical cold-chain excursion",
+            "message": "Temperature excursion detected (+4.8°C). Threshold exceeded for 45 minutes.",
+            "recommended_action": "quarantine_and_review",
+            "acknowledged": False,
+            "created_at": now,
+        },
+        {
+            "user_id": user_id,
+            "shipment_id": "SHP-1028",
+            "type": "weather",
+            "severity": "high",
+            "title": "Severe weather detected",
+            "message": "Heavy swell and gale force winds along route. Transit speed reduced.",
+            "recommended_action": "review_route",
+            "acknowledged": False,
+            "created_at": now,
+        },
+    ]
+    sb = get_supabase()
+    try:
+        sb.table("alerts").insert(alerts_to_seed).execute()
+    except Exception as e:
+        print(f"⚠️ Failed to bootstrap alerts: {e}")
+
+
+def resolve_alert(user_id: str, alert_id: str, acknowledged: bool = True) -> bool:
+    """Mark an alert as acknowledged / resolved in database."""
+    sb = get_supabase()
+    try:
+        sb.table("alerts").update({"acknowledged": acknowledged}).eq("user_id", user_id).eq("id", alert_id).execute()
+        return True
+    except Exception as e:
+        print(f"⚠️ Failed to resolve alert {alert_id}: {e}")
+        return False
+
+
 def get_all_alerts(user_id: str, limit: int = 50) -> list[dict]:
-    """Get all recent alerts for a user."""
+    """Get all recent alerts for a user. Bootstraps canonical alerts if none exist."""
     sb = get_supabase()
     try:
         result = (
@@ -165,8 +221,21 @@ def get_all_alerts(user_id: str, limit: int = 50) -> list[dict]:
             .limit(limit)
             .execute()
         )
-        return result.data or []
-    except Exception:
+        existing = result.data or []
+        if len(existing) == 0:
+            bootstrap_alerts_for_user(user_id)
+            result = (
+                sb.table("alerts")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            existing = result.data or []
+        return existing
+    except Exception as e:
+        print(f"⚠️ Error fetching alerts: {e}")
         return []
 
 

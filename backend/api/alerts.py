@@ -11,8 +11,12 @@ from services.tracking_service import get_shipment_tracking
 from services.weather_service import get_weather_at_position, get_speed_modifier
 from services.risk_service import calculate_risk
 from services.coldchain_service import detect_excursion
-from services.disruption_service import match_shipments
-from services.alert_service import get_alerts_for_shipment, get_all_alerts, check_and_generate_alerts
+from services.alert_service import (
+    check_and_generate_alerts,
+    get_alerts_for_shipment,
+    get_all_alerts,
+    resolve_alert,
+)
 from db.queries import get_sensor_log_for_shipment
 
 router = APIRouter(tags=["Risk & Alerts"])
@@ -120,6 +124,14 @@ async def list_alerts(user_id: str = Depends(get_current_user)):
     """Get all alerts for the user."""
     alerts = get_all_alerts(user_id)
     return alerts
+
+
+@router.post("/alerts/{alert_id}/resolve")
+@router.patch("/alerts/{alert_id}/resolve")
+async def mark_alert_resolved(alert_id: str, user_id: str = Depends(get_current_user)):
+    """Mark an alert as resolved / acknowledged in Supabase."""
+    success = resolve_alert(user_id, alert_id, acknowledged=True)
+    return {"status": "ok", "resolved": success, "alert_id": alert_id}
 
 
 def _parse_waypoints(wp) -> list[str]:
