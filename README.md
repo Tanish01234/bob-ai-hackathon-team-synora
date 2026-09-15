@@ -220,5 +220,5 @@ uvicorn main:app --reload --port 8000
 - [`demo/demo-video-link.txt`](demo/demo-video-link.txt) — Walkthrough video reference
 - [`demo/README.md`](demo/README.md) — Judge demonstration guide
 - [`demo/screenshots/`](demo/screenshots/) — Production interface captures
-- [`presentation/slides.pdf`](presentation/slides.pdf) — Presentation slide deck
+- [`presentation/slides.pdf`](presentation/slides.ppt) — Presentation slide deck
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution guidelines and security policies
