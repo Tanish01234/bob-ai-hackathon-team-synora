@@ -19,6 +19,12 @@
 
 ---
 
+## 🎥 Demo Video
+
+[Watch the BOB AI Hackathon Demo on YouTube](https://www.youtube.com/watch?v=CTGBRrny7q4)
+
+---
+
 ## Problem Statement
 
 Modern global logistics operations suffer from acute signal fragmentation:
