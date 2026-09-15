@@ -69,7 +69,7 @@ jobs:
             "demo/live-demo-url.txt"
             "demo/demo-video-link.txt"
             "demo/README.md"
-            "presentation/slides.pdf"
+            "presentation/slides.ppt"
             "demo/screenshots/01-home-dashboard.png"
             "demo/screenshots/02-bob-ai.png"
             "demo/screenshots/03-shipment-intelligence.png"
