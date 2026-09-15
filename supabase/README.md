@@ -80,6 +80,6 @@ cd bob-supply-chain-intelligence
 pnpm run dev
 ```
 
-## 9. Open the Dashboard
+## 9. Open the Dashboard only.
 
 Navigate to `http://localhost:3000` and log in with your registered credentials.
